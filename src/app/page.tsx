@@ -8,7 +8,7 @@ import { MilkBottleIcon } from '@/components/MilkBottleIcon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { compressImage } from '@/lib/imageCompression';
 import { sendWhatsAppDeliveryMessage, sendWhatsAppAbsentAlert } from '@/lib/whatsapp';
-import { MilkSubtype, ExtraItem } from '@/types';
+import { MilkSubtype, ExtraItem, UnitType } from '@/types';
 import {
   Camera,
   X,
@@ -44,6 +44,7 @@ export default function TodayPage() {
     addDeliveryEntry,
     markTodayAbsent,
     addPurchase,
+    addProduct,
   } = useMitra();
 
   // Selected Milk Subtype
@@ -85,12 +86,15 @@ export default function TodayPage() {
   const [entryNotes, setEntryNotes] = useState<string>('');
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
+
+  // Elder & Child-Friendly Extra Items State
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
-  const [isAddingExtra, setIsAddingExtra] = useState(false);
-  const [newExtraName, setNewExtraName] = useState('Fresh Malai Paneer');
-  const [newExtraQty, setNewExtraQty] = useState(1);
-  const [newExtraUnit, setNewExtraUnit] = useState<'count' | 'kilogram' | 'litre'>('count');
-  const [newExtraPrice, setNewExtraPrice] = useState(40);
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customItemName, setCustomItemName] = useState('');
+  const [customItemUnit, setCustomItemUnit] = useState<UnitType>('count');
+  const [customItemPrice, setCustomItemPrice] = useState<number>(40);
+  const [customItemQty, setCustomItemQty] = useState<number>(1);
+  const [saveCustomToCatalog, setSaveCustomToCatalog] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlinePhotoInputRef = useRef<HTMLInputElement | null>(null);
@@ -138,6 +142,7 @@ export default function TodayPage() {
     setPhotoDataUrl(null);
     setEntryNotes('');
     setExtraItems([]);
+    setIsAddingCustom(false);
     setIsModalOpen(true);
   };
 
@@ -168,31 +173,124 @@ export default function TodayPage() {
     }
   };
 
-  // Add Extra Item
-  const handleAddExtraItem = () => {
-    if (!newExtraName) return;
-    const item: ExtraItem = {
-      id: `ex_${Date.now()}`,
-      name: newExtraName,
-      quantity: newExtraQty,
-      unit: newExtraUnit,
-      price: newExtraPrice,
-    };
-    setExtraItems([...extraItems, item]);
-    setIsAddingExtra(false);
-    setNewExtraName('');
-    setNewExtraPrice(40);
-    setNewExtraQty(1);
+  // Helper for quick-pick visual emoji badges
+  const getItemEmoji = (name: string): string => {
+    const lower = name.toLowerCase();
+    if (lower.includes('paneer')) return '🧀';
+    if (lower.includes('curd') || lower.includes('dahi')) return '🥣';
+    if (lower.includes('ghee')) return '🧈';
+    if (lower.includes('butter') || lower.includes('makhan')) return '🧈';
+    if (lower.includes('chaas') || lower.includes('buttermilk')) return '🥛';
+    if (lower.includes('sweet') || lower.includes('peda') || lower.includes('mithai')) return '🍬';
+    if (lower.includes('cheese')) return '🧀';
+    if (lower.includes('milk') || lower.includes('doodh')) return '🥛';
+    if (lower.includes('egg')) return '🥚';
+    if (lower.includes('bread')) return '🍞';
+    return '📦';
   };
 
+  // Build the list of quick-pick extra products from household catalog + standard dairy staples
+  const catalogExtraProducts = products
+    .filter((p) => !p.is_milk_type)
+    .map((p) => ({
+      name: p.name,
+      unit: p.unit_type,
+      defaultPrice: p.default_price,
+      emoji: getItemEmoji(p.name),
+    }));
+
+  const standardDairyStaples = [
+    { name: 'Farm Fresh Dahi / Curd', unit: 'count' as UnitType, defaultPrice: 40, emoji: '🥣' },
+    { name: 'Fresh Malai Paneer', unit: 'kilogram' as UnitType, defaultPrice: 380, emoji: '🧀' },
+    { name: 'Desi Cow Ghee', unit: 'litre' as UnitType, defaultPrice: 650, emoji: '🧈' },
+    { name: 'White Butter (Makhan)', unit: 'count' as UnitType, defaultPrice: 50, emoji: '🧈' },
+    { name: 'Masala Chaas', unit: 'count' as UnitType, defaultPrice: 15, emoji: '🥛' },
+  ];
+
+  const availableExtraProducts = [...catalogExtraProducts];
+  for (const staple of standardDairyStaples) {
+    if (!availableExtraProducts.some((p) => p.name.toLowerCase().includes(staple.name.toLowerCase().split(' ')[0]))) {
+      availableExtraProducts.push(staple);
+    }
+  }
+
+  // 1-Tap Toggle or Add Extra Item from horizontal scroll track
+  const handleToggleOrAddExtra = (prod: { name: string; unit: UnitType; defaultPrice: number; emoji: string }) => {
+    const existingIndex = extraItems.findIndex((i) => i.name === prod.name);
+    if (existingIndex >= 0) {
+      const step = prod.unit === 'kilogram' ? 0.25 : 1;
+      const updated = [...extraItems];
+      updated[existingIndex].quantity = parseFloat((updated[existingIndex].quantity + step).toFixed(2));
+      setExtraItems(updated);
+    } else {
+      const initialQty = prod.unit === 'kilogram' ? 0.5 : 1;
+      const newItem: ExtraItem = {
+        id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: prod.name,
+        quantity: initialQty,
+        unit: prod.unit,
+        price: prod.defaultPrice,
+      };
+      setExtraItems([...extraItems, newItem]);
+    }
+  };
+
+  // Update quantity with stepper (+ or -)
+  const handleUpdateExtraQty = (itemId: string, delta: number) => {
+    setExtraItems((prev) =>
+      prev
+        .map((item) => {
+          if (item.id !== itemId) return item;
+          const newQty = parseFloat((item.quantity + delta).toFixed(2));
+          return { ...item, quantity: newQty };
+        })
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
+  // Remove extra item
   const handleRemoveExtraItem = (id: string) => {
-    setExtraItems(extraItems.filter((i) => i.id !== id));
+    setExtraItems((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  // Add custom / new product created on the fly
+  const handleAddCustomItem = () => {
+    const trimmedName = customItemName.trim();
+    if (!trimmedName || customItemPrice <= 0) {
+      alert('Please enter a product name and valid price.');
+      return;
+    }
+
+    if (saveCustomToCatalog && dairyVendor && household) {
+      addProduct({
+        household_id: household.id,
+        vendor_id: dairyVendor.id,
+        name: trimmedName,
+        unit_type: customItemUnit,
+        default_price: customItemPrice,
+        is_milk_type: false,
+      });
+    }
+
+    const newItem: ExtraItem = {
+      id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: trimmedName,
+      quantity: customItemQty,
+      unit: customItemUnit,
+      price: customItemPrice,
+    };
+
+    setExtraItems((prev) => [...prev, newItem]);
+    setIsAddingCustom(false);
+    setCustomItemName('');
+    setCustomItemPrice(40);
+    setCustomItemQty(1);
   };
 
   // Total price calculation
   const milkTotal = entryQuantity * currentRate;
-  const extraTotal = extraItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
-  const grandTotal = milkTotal + extraTotal;
+  const extraTotal = extraItems.reduce((acc, curr) => acc + Math.round(curr.price * curr.quantity), 0);
+  const grandTotal = Math.round(milkTotal + extraTotal);
 
   // Submit Quick Entry
   const handleSubmitEntry = async (e: React.FormEvent) => {
@@ -1077,88 +1175,263 @@ export default function TodayPage() {
                 </div>
               </div>
 
-              {/* Bundled Extra Items Section (To Save WhatsApp Quota) */}
-              <div className="extra-items-box">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                    {t.today.addItems}
-                  </span>
-                  {!isAddingExtra && (
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingExtra(true)}
-                      style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 700 }}
-                      id="btn-add-extra-item"
-                    >
-                      {t.today.addItemBtn}
-                    </button>
-                  )}
-                </div>
-
-                {extraItems.map((item) => (
-                  <div key={item.id} className="extra-item-row" style={{ justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
-                      • {item.name} ({item.quantity} {item.unit})
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>₹{item.price * item.quantity}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExtraItem(item.id)}
-                        style={{ color: '#ef4444' }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+              {/* Extra Items Section: Scrollable Quick Pick Carousel + Bundled List */}
+              <div className="extra-quick-picker">
+                <div className="quick-picker-header">
+                  <div>
+                    <div className="quick-picker-title">
+                      <span>🛒</span> {t.today.addItems}
+                    </div>
+                    <div className="quick-picker-sub">
+                      {t.today.quickPickSubtitle}
                     </div>
                   </div>
-                ))}
+                </div>
 
-                {isAddingExtra && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.4rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Item (Paneer, Curd)"
-                        value={newExtraName}
-                        onChange={(e) => setNewExtraName(e.target.value)}
-                        className="form-input"
-                        style={{ padding: '0.4rem', fontSize: '0.82rem' }}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Qty"
-                        value={newExtraQty}
-                        onChange={(e) => setNewExtraQty(parseInt(e.target.value, 10) || 1)}
-                        className="form-input"
-                        style={{ padding: '0.4rem', fontSize: '0.82rem' }}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Price ₹"
-                        value={newExtraPrice}
-                        onChange={(e) => setNewExtraPrice(parseFloat(e.target.value) || 0)}
-                        className="form-input"
-                        style={{ padding: '0.4rem', fontSize: '0.82rem' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {/* Horizontal Scrollable Carousel for Elders & Kids */}
+                <div className="quick-carousel-track" role="region" aria-label="Extra items quick picker">
+                  {availableExtraProducts.map((prod) => {
+                    const matchedItem = extraItems.find((i) => i.name === prod.name);
+                    const isSelected = !!matchedItem;
+                    return (
+                      <button
+                        key={prod.name}
+                        type="button"
+                        onClick={() => handleToggleOrAddExtra(prod)}
+                        className={`quick-item-card ${isSelected ? 'active' : ''}`}
+                        title={`Tap to add ${prod.name}`}
+                      >
+                        <span className="quick-item-emoji">{prod.emoji}</span>
+                        <span className="quick-item-name">{prod.name}</span>
+                        <span className="quick-item-price">
+                          ₹{prod.defaultPrice} <small>/{prod.unit === 'kilogram' ? 'kg' : prod.unit === 'litre' ? 'L' : 'pkt'}</small>
+                        </span>
+                        <span className={`quick-item-btn-tag ${isSelected ? 'added' : ''}`}>
+                          {isSelected ? `✓ Added (${matchedItem?.quantity})` : '+ Add'}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {/* + New / Custom Item Card at the end of the scroll track */}
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingCustom(!isAddingCustom)}
+                    className="quick-item-card new-item-card"
+                    title="Add a new custom product"
+                  >
+                    <span className="quick-item-emoji">➕</span>
+                    <span className="quick-item-name">{t.today.customItemTitle}</span>
+                    <span className="quick-item-price"><small>Custom rate</small></span>
+                    <span className="quick-item-btn-tag">+ Create</span>
+                  </button>
+                </div>
+
+                {/* Expandable Custom Item Form if "+ New Item" is clicked */}
+                {isAddingCustom && (
+                  <div className="custom-extra-sheet">
+                    <div className="custom-sheet-header">
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                        {t.today.customItemTitle}
+                      </strong>
                       <button
                         type="button"
-                        onClick={handleAddExtraItem}
-                        className="btn-primary"
-                        style={{ padding: '0.4rem', fontSize: '0.8rem' }}
+                        onClick={() => setIsAddingCustom(false)}
+                        style={{ color: 'var(--text-muted)', background: 'transparent' }}
                       >
-                        Add to bundle
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingExtra(false)}
-                        className="btn-secondary"
-                        style={{ padding: '0.4rem', fontSize: '0.8rem' }}
-                      >
-                        Cancel
+                        <X size={16} />
                       </button>
                     </div>
+
+                    {/* Quick suggestion chips */}
+                    <div className="quick-suggestions-row">
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Quick tap:</span>
+                      {[
+                        { label: 'White Butter', price: 50, unit: 'count' as UnitType },
+                        { label: 'Masala Chaas', price: 15, unit: 'count' as UnitType },
+                        { label: 'Khoya / Mawa', price: 320, unit: 'kilogram' as UnitType },
+                        { label: 'Cheese Slices', price: 140, unit: 'count' as UnitType },
+                        { label: 'Sweets / Peda', price: 260, unit: 'kilogram' as UnitType },
+                      ].map((sugg) => (
+                        <button
+                          key={sugg.label}
+                          type="button"
+                          className="chip-btn"
+                          onClick={() => {
+                            setCustomItemName(sugg.label);
+                            setCustomItemPrice(sugg.price);
+                            setCustomItemUnit(sugg.unit);
+                          }}
+                        >
+                          + {sugg.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.45rem' }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Item Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Buffalo Butter, Khoya, Chaas..."
+                          value={customItemName}
+                          onChange={(e) => setCustomItemName(e.target.value)}
+                          className="form-input"
+                          style={{ padding: '0.45rem 0.65rem', fontSize: '0.85rem' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.45rem' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>Unit Type</label>
+                          <select
+                            value={customItemUnit}
+                            onChange={(e) => setCustomItemUnit(e.target.value as UnitType)}
+                            className="form-select"
+                            style={{ padding: '0.45rem 0.65rem', fontSize: '0.82rem' }}
+                          >
+                            <option value="count">Packets / Units</option>
+                            <option value="kilogram">Kilograms (kg)</option>
+                            <option value="litre">Litres (L)</option>
+                          </select>
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>Unit Price (₹)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={customItemPrice}
+                            onChange={(e) => setCustomItemPrice(parseFloat(e.target.value) || 0)}
+                            className="form-input"
+                            style={{ padding: '0.45rem 0.65rem', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quantity Stepper */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Quantity:</span>
+                        <div className="mini-stepper">
+                          <button
+                            type="button"
+                            className="mini-step-btn"
+                            onClick={() =>
+                              setCustomItemQty((q) =>
+                                Math.max(customItemUnit === 'kilogram' ? 0.25 : 1, parseFloat((q - (customItemUnit === 'kilogram' ? 0.25 : 1)).toFixed(2)))
+                              )
+                            }
+                          >
+                            -
+                          </button>
+                          <span className="mini-step-val">
+                            {customItemQty} <small>{customItemUnit === 'kilogram' ? 'kg' : customItemUnit === 'litre' ? 'L' : 'pkt'}</small>
+                          </span>
+                          <button
+                            type="button"
+                            className="mini-step-btn"
+                            onClick={() =>
+                              setCustomItemQty((q) =>
+                                parseFloat((q + (customItemUnit === 'kilogram' ? 0.25 : 1)).toFixed(2))
+                              )
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--primary)' }}>
+                          ₹{Math.round(customItemPrice * customItemQty)}
+                        </span>
+                      </div>
+
+                      {/* Save to product catalog checkbox */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.76rem', color: 'var(--text-secondary)', cursor: 'pointer', margin: '0.2rem 0' }}>
+                        <input
+                          type="checkbox"
+                          checked={saveCustomToCatalog}
+                          onChange={(e) => setSaveCustomToCatalog(e.target.checked)}
+                          style={{ accentColor: 'var(--primary)', width: 15, height: 15 }}
+                        />
+                        <span>{t.today.saveToCatalog}</span>
+                      </label>
+
+                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
+                        <button
+                          type="button"
+                          onClick={handleAddCustomItem}
+                          className="btn-primary"
+                          style={{ flex: 1, padding: '0.5rem', fontSize: '0.82rem' }}
+                        >
+                          Add to Today's Delivery (₹{Math.round(customItemPrice * customItemQty)})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingCustom(false)}
+                          className="btn-secondary"
+                          style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Included Extra Items List */}
+                {extraItems.length > 0 && (
+                  <div className="bundled-extras-container">
+                    <div className="bundled-extras-header">
+                      <span>📦 {t.today.includedItems} ({extraItems.length}):</span>
+                      <span style={{ color: 'var(--primary)', fontWeight: 800 }}>+₹{extraTotal}</span>
+                    </div>
+
+                    {extraItems.map((item) => {
+                      const step = item.unit === 'kilogram' ? 0.25 : 1;
+                      const itemTotal = Math.round(item.price * item.quantity);
+                      return (
+                        <div key={item.id} className="bundled-item-row">
+                          <div className="bundled-item-info">
+                            <span className="bundled-item-name">
+                              {getItemEmoji(item.name)} {item.name}
+                            </span>
+                            <div className="bundled-item-calc">
+                              ₹{item.price}/{item.unit === 'kilogram' ? 'kg' : item.unit === 'litre' ? 'L' : 'pkt'} × {item.quantity} = <strong>₹{itemTotal}</strong>
+                            </div>
+                          </div>
+
+                          <div className="bundled-item-actions">
+                            <div className="mini-stepper">
+                              <button
+                                type="button"
+                                className="mini-step-btn"
+                                onClick={() => handleUpdateExtraQty(item.id, -step)}
+                                aria-label="Decrease quantity"
+                              >
+                                -
+                              </button>
+                              <span className="mini-step-val">
+                                {item.quantity} <small>{item.unit === 'kilogram' ? 'kg' : item.unit === 'litre' ? 'L' : 'pkt'}</small>
+                              </span>
+                              <button
+                                type="button"
+                                className="mini-step-btn"
+                                onClick={() => handleUpdateExtraQty(item.id, step)}
+                                aria-label="Increase quantity"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveExtraItem(item.id)}
+                              className="mini-delete-btn"
+                              aria-label="Remove item"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
