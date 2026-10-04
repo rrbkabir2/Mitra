@@ -89,6 +89,7 @@ export default function TodayPage() {
 
   // Extra Items State (Matching User's Dropdown & Custom Item Specification)
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
+  const [isAddingExtraItem, setIsAddingExtraItem] = useState(false);
   const [isNewProductMode, setIsNewProductMode] = useState(false);
   const [selectedExtraProduct, setSelectedExtraProduct] = useState('Fresh Malai Paneer');
   const [extraItemName, setExtraItemName] = useState('Fresh Malai Paneer');
@@ -143,6 +144,7 @@ export default function TodayPage() {
     setPhotoDataUrl(null);
     setEntryNotes('');
     setExtraItems([]);
+    setIsAddingExtraItem(false);
     setIsNewProductMode(false);
 
     if (availableProductsList.length > 0) {
@@ -252,9 +254,10 @@ export default function TodayPage() {
     };
 
     setExtraItems((prev) => [...prev, newItem]);
+    setIsAddingExtraItem(false);
+    setIsNewProductMode(false);
 
     // Reset form to first option in list
-    setIsNewProductMode(false);
     if (availableProductsList.length > 0) {
       const p = availableProductsList[0];
       setSelectedExtraProduct(p.name);
@@ -266,6 +269,7 @@ export default function TodayPage() {
   };
 
   const handleResetExtraForm = () => {
+    setIsAddingExtraItem(false);
     setIsNewProductMode(false);
     if (availableProductsList.length > 0) {
       const p = availableProductsList[0];
@@ -1183,30 +1187,17 @@ export default function TodayPage() {
                 </div>
               </div>
 
-              {/* Extra Items Section: Dropdown of Existing Products + New Product Mode */}
+                     {/* Extra Items Section: Dropdown of Existing Products + In-between New Product Mode */}
               <div className="extra-items-box">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isAddingExtraItem || extraItems.length > 0 ? '0.65rem' : 0 }}>
                   <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <span>🛒</span> {t.today.addItems}
                   </span>
-                  {!isNewProductMode ? (
+                  {!isAddingExtraItem && (
                     <button
                       type="button"
                       onClick={() => {
-                        setIsNewProductMode(true);
-                        setExtraItemName('');
-                        setExtraItemPrice(0);
-                        setExtraItemQty(1);
-                      }}
-                      style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 700, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                      id="btn-switch-new-product"
-                    >
-                      <Plus size={14} /> + New Product
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
+                        setIsAddingExtraItem(true);
                         setIsNewProductMode(false);
                         if (availableProductsList.length > 0) {
                           const p = availableProductsList[0];
@@ -1217,182 +1208,234 @@ export default function TodayPage() {
                           setExtraItemQty(p.unit === 'kilogram' ? 0.5 : 1);
                         }
                       }}
-                      style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 700, background: 'transparent', cursor: 'pointer' }}
-                      id="btn-switch-options"
+                      style={{
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        color: '#ffffff',
+                        background: 'var(--primary)',
+                        border: 'none',
+                        borderRadius: '9999px',
+                        padding: '0.35rem 0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        boxShadow: '0 2px 6px rgba(0, 168, 132, 0.3)',
+                      }}
+                      id="btn-add-extra-item-trigger"
                     >
-                      ← Select Existing Option
+                      <Plus size={14} /> Add Extra Item
                     </button>
                   )}
                 </div>
 
-                {/* Row 1: Product Selector (Dropdown) or Custom Name Input */}
-                <div className="form-group" style={{ marginBottom: '0.6rem' }}>
-                  <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{isNewProductMode ? 'Type Product Name' : 'Select Product from Options'}</span>
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.72rem' }}>
-                      {isNewProductMode ? 'New custom item' : 'Catalog products'}
-                    </span>
-                  </label>
+                {/* Form when user clicked Add Extra Item */}
+                {isAddingExtraItem && (
+                  <div style={{ background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: 'var(--radius-md)', padding: '0.85rem', marginTop: '0.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                    {/* 1. If NOT New Product Mode: Listed Products Dropdown */}
+                    {!isNewProductMode ? (
+                      <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                        <label className="form-label" style={{ fontSize: '0.78rem' }}>
+                          Select Product from Catalog:
+                        </label>
+                        <select
+                          value={selectedExtraProduct}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedExtraProduct(val);
+                            const found = availableProductsList.find((p) => p.name === val);
+                            if (found) {
+                              setExtraItemName(found.name);
+                              setExtraItemUnit(found.unit);
+                              setExtraItemPrice(found.defaultPrice);
+                              setExtraItemQty(found.unit === 'kilogram' ? 0.5 : 1);
+                            }
+                          }}
+                          className="form-select"
+                          style={{ fontSize: '0.92rem', padding: '0.55rem 0.75rem', fontWeight: 600 }}
+                          id="select-extra-product"
+                        >
+                          {availableProductsList.map((prod) => (
+                            <option key={prod.name} value={prod.name}>
+                              {prod.emoji} {prod.name} (₹{prod.defaultPrice} / {prod.unit === 'kilogram' ? 'kg' : prod.unit === 'litre' ? 'L' : 'pkt'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      /* 2. If New Product Mode: Type Name instead */
+                      <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                          <label className="form-label" style={{ fontSize: '0.78rem', marginBottom: 0 }}>
+                            Type Product Name:
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsNewProductMode(false)}
+                            style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, background: 'transparent', cursor: 'pointer' }}
+                          >
+                            ← Choose from catalog options
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Type new product name (e.g. Buffalo Butter, Khoya, Paneer)..."
+                          value={extraItemName}
+                          onChange={(e) => setExtraItemName(e.target.value)}
+                          className="form-input"
+                          style={{ fontSize: '0.92rem', padding: '0.55rem 0.75rem' }}
+                          id="input-new-extra-name"
+                          autoFocus
+                        />
+                      </div>
+                    )}
 
-                  {!isNewProductMode ? (
-                    <select
-                      value={selectedExtraProduct}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '__custom__') {
-                          setIsNewProductMode(true);
-                          setExtraItemName('');
-                          setExtraItemPrice(0);
-                          setExtraItemQty(1);
-                        } else {
-                          setSelectedExtraProduct(val);
-                          const found = availableProductsList.find((p) => p.name === val);
-                          if (found) {
-                            setExtraItemName(found.name);
-                            setExtraItemUnit(found.unit);
-                            setExtraItemPrice(found.defaultPrice);
-                            setExtraItemQty(found.unit === 'kilogram' ? 0.5 : 1);
-                          }
-                        }
-                      }}
-                      className="form-select"
-                      style={{ fontSize: '0.92rem', padding: '0.55rem 0.75rem', fontWeight: 600 }}
-                      id="select-extra-product"
-                    >
-                      {availableProductsList.map((prod) => (
-                        <option key={prod.name} value={prod.name}>
-                          {prod.emoji} {prod.name} (₹{prod.defaultPrice} / {prod.unit === 'kilogram' ? 'kg' : prod.unit === 'litre' ? 'L' : 'pkt'})
-                        </option>
-                      ))}
-                      <option value="__custom__">➕ + Add New Product (Type custom name)...</option>
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      placeholder="e.g. Buffalo Butter, Khoya, Paneer..."
-                      value={extraItemName}
-                      onChange={(e) => setExtraItemName(e.target.value)}
-                      className="form-input"
-                      style={{ fontSize: '0.92rem', padding: '0.55rem 0.75rem' }}
-                      id="input-new-extra-name"
-                      autoFocus
-                    />
-                  )}
-                </div>
+                    {/* Row: Quantity | Unit / Weight (kg, Litre, Packet) | Price (₹) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                      {/* Quantity */}
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.76rem' }}>Quantity</label>
+                        <div className="mini-stepper" style={{ background: '#f8fafc', border: '1.5px solid var(--border-glass)', padding: '0.2rem 0.3rem', height: 42 }}>
+                          <button
+                            type="button"
+                            className="mini-step-btn"
+                            onClick={() => {
+                              const step = extraItemUnit === 'kilogram' ? 0.25 : 1;
+                              setExtraItemQty((q) => Math.max(step, parseFloat((q - step).toFixed(2))));
+                            }}
+                            style={{ width: 28, height: 28, fontSize: '1rem' }}
+                            aria-label="Decrease quantity"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            step={extraItemUnit === 'kilogram' ? '0.25' : '1'}
+                            min={extraItemUnit === 'kilogram' ? '0.25' : '1'}
+                            value={extraItemQty}
+                            onChange={(e) => setExtraItemQty(parseFloat(e.target.value) || 1)}
+                            style={{ width: '100%', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 800, fontSize: '0.95rem', outline: 'none' }}
+                          />
+                          <button
+                            type="button"
+                            className="mini-step-btn"
+                            onClick={() => {
+                              const step = extraItemUnit === 'kilogram' ? 0.25 : 1;
+                              setExtraItemQty((q) => parseFloat((q + step).toFixed(2)));
+                            }}
+                            style={{ width: 28, height: 28, fontSize: '1rem' }}
+                            aria-label="Increase quantity"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
 
-                {/* Row 2: Quantity | Unit / Weight | Price (₹) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.6rem', marginBottom: '0.85rem' }}>
-                  {/* Quantity */}
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Quantity</label>
-                    <div className="mini-stepper" style={{ background: '#ffffff', border: '1.5px solid var(--border-glass)', padding: '0.2rem 0.3rem', height: 42 }}>
+                      {/* Unit / Weight */}
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.76rem' }}>Unit / Weight</label>
+                        <select
+                          value={extraItemUnit}
+                          onChange={(e) => setExtraItemUnit(e.target.value as UnitType)}
+                          className="form-select"
+                          style={{ fontSize: '0.85rem', padding: '0.45rem 0.5rem', height: 42 }}
+                        >
+                          <option value="kilogram">kg (Kilogram)</option>
+                          <option value="litre">L (Litre)</option>
+                          <option value="count">Pkt / Unit</option>
+                        </select>
+                      </div>
+
+                      {/* Price with ₹ symbol */}
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.76rem' }}>Price (₹)</label>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ position: 'absolute', left: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={extraItemPrice}
+                            onChange={(e) => setExtraItemPrice(parseFloat(e.target.value) || 0)}
+                            className="form-input"
+                            style={{ paddingLeft: '1.6rem', paddingRight: '0.5rem', fontSize: '0.95rem', fontWeight: 700, height: 42 }}
+                            id="input-extra-price"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* In-Between Button: "+ New Product / Item" when in list mode */}
+                    {!isNewProductMode ? (
+                      <div style={{ marginBottom: '0.75rem', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsNewProductMode(true);
+                            setExtraItemName('');
+                            setExtraItemPrice(0);
+                            setExtraItemQty(1);
+                          }}
+                          style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            color: 'var(--primary)',
+                            background: '#f0fdf4',
+                            border: '1px dashed var(--primary)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '0.45rem 0.85rem',
+                            width: '100%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                          }}
+                          id="btn-switch-new-product"
+                        >
+                          <Plus size={14} /> + New Product (Not in catalog? Type custom name)
+                        </button>
+                      </div>
+                    ) : (
+                      /* If New Product Mode: Save to catalog checkbox */
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.76rem', color: 'var(--text-secondary)', cursor: 'pointer', marginBottom: '0.75rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={saveCustomToCatalog}
+                          onChange={(e) => setSaveCustomToCatalog(e.target.checked)}
+                          style={{ accentColor: 'var(--primary)', width: 15, height: 15 }}
+                        />
+                        <span>{t.today.saveToCatalog}</span>
+                      </label>
+                    )}
+
+                    {/* Action Buttons: Add to bundle & Cancel */}
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
                         type="button"
-                        className="mini-step-btn"
-                        onClick={() => {
-                          const step = extraItemUnit === 'kilogram' ? 0.25 : 1;
-                          setExtraItemQty((q) => Math.max(step, parseFloat((q - step).toFixed(2))));
-                        }}
-                        style={{ width: 28, height: 28, fontSize: '1rem' }}
-                        aria-label="Decrease quantity"
+                        onClick={handleDirectAddExtraItem}
+                        className="btn-primary"
+                        style={{ flex: 1, padding: '0.65rem', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                        id="btn-add-to-bundle"
                       >
-                        -
+                        <span>Add to bundle</span>
+                        <span style={{ opacity: 0.95, fontSize: '0.85rem', fontWeight: 800, background: 'rgba(255,255,255,0.2)', padding: '0.15rem 0.45rem', borderRadius: 4 }}>
+                          ₹{Math.round(extraItemPrice * extraItemQty)}
+                        </span>
                       </button>
-                      <input
-                        type="number"
-                        step={extraItemUnit === 'kilogram' ? '0.25' : '1'}
-                        min={extraItemUnit === 'kilogram' ? '0.25' : '1'}
-                        value={extraItemQty}
-                        onChange={(e) => setExtraItemQty(parseFloat(e.target.value) || 1)}
-                        style={{ width: '100%', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 800, fontSize: '0.95rem', outline: 'none' }}
-                      />
                       <button
                         type="button"
-                        className="mini-step-btn"
-                        onClick={() => {
-                          const step = extraItemUnit === 'kilogram' ? 0.25 : 1;
-                          setExtraItemQty((q) => parseFloat((q + step).toFixed(2)));
-                        }}
-                        style={{ width: 28, height: 28, fontSize: '1rem' }}
-                        aria-label="Increase quantity"
+                        onClick={handleResetExtraForm}
+                        className="btn-secondary"
+                        style={{ padding: '0.65rem 1.1rem', fontSize: '0.85rem' }}
+                        id="btn-cancel-extra-form"
                       >
-                        +
+                        Cancel
                       </button>
                     </div>
                   </div>
-
-                  {/* Unit / Weight */}
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Unit / Weight</label>
-                    <select
-                      value={extraItemUnit}
-                      onChange={(e) => setExtraItemUnit(e.target.value as UnitType)}
-                      className="form-select"
-                      style={{ fontSize: '0.85rem', padding: '0.45rem 0.5rem', height: 42 }}
-                    >
-                      <option value="kilogram">kg (Kilogram)</option>
-                      <option value="litre">L (Litre)</option>
-                      <option value="count">Pkt / Unit</option>
-                    </select>
-                  </div>
-
-                  {/* Price with ₹ symbol */}
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Price (₹)</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <span style={{ position: 'absolute', left: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-                        ₹
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={extraItemPrice}
-                        onChange={(e) => setExtraItemPrice(parseFloat(e.target.value) || 0)}
-                        className="form-input"
-                        style={{ paddingLeft: '1.6rem', paddingRight: '0.5rem', fontSize: '0.95rem', fontWeight: 700, height: 42 }}
-                        id="input-extra-price"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* If New Product Mode: Save to catalog checkbox */}
-                {isNewProductMode && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.76rem', color: 'var(--text-secondary)', cursor: 'pointer', marginBottom: '0.65rem' }}>
-                    <input
-                      type="checkbox"
-                      checked={saveCustomToCatalog}
-                      onChange={(e) => setSaveCustomToCatalog(e.target.checked)}
-                      style={{ accentColor: 'var(--primary)', width: 15, height: 15 }}
-                    />
-                    <span>{t.today.saveToCatalog}</span>
-                  </label>
                 )}
-
-                {/* Row 3: Action Buttons */}
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={handleDirectAddExtraItem}
-                    className="btn-primary"
-                    style={{ flex: 1, padding: '0.65rem', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                    id="btn-add-to-bundle"
-                  >
-                    <span>Add to bundle</span>
-                    <span style={{ opacity: 0.95, fontSize: '0.85rem', fontWeight: 800, background: 'rgba(255,255,255,0.2)', padding: '0.15rem 0.45rem', borderRadius: 4 }}>
-                      ₹{Math.round(extraItemPrice * extraItemQty)}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetExtraForm}
-                    className="btn-secondary"
-                    style={{ padding: '0.65rem 1.1rem', fontSize: '0.85rem' }}
-                    id="btn-cancel-extra-form"
-                  >
-                    Cancel
-                  </button>
-                </div>
 
                 {/* Included Extra Items List */}
                 {extraItems.length > 0 && (
