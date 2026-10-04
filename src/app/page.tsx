@@ -91,11 +91,11 @@ export default function TodayPage() {
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [isAddingExtraItem, setIsAddingExtraItem] = useState(true);
   const [isNewProductMode, setIsNewProductMode] = useState(false);
-  const [selectedExtraProduct, setSelectedExtraProduct] = useState('Farm Fresh Dahi / Curd');
-  const [extraItemName, setExtraItemName] = useState('Farm Fresh Dahi / Curd');
+  const [selectedExtraProduct, setSelectedExtraProduct] = useState('Fresh Malai Paneer');
+  const [extraItemName, setExtraItemName] = useState('Fresh Malai Paneer');
   const [extraItemQty, setExtraItemQty] = useState<number>(1);
-  const [extraItemUnit, setExtraItemUnit] = useState<UnitType>('count');
-  const [extraItemPrice, setExtraItemPrice] = useState<number>(40);
+  const [extraItemUnit, setExtraItemUnit] = useState<UnitType>('kilogram');
+  const [extraItemPrice, setExtraItemPrice] = useState<number>(380);
   const [saveCustomToCatalog, setSaveCustomToCatalog] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1181,7 +1181,9 @@ export default function TodayPage() {
                     type="text"
                     value={`₹${currentRate}`}
                     readOnly
+                    className="form-input"
                     style={{ background: '#f1f5f9', cursor: 'not-allowed', fontWeight: 700 }}
+                    id="input-unit-price"
                   />
                 </div>
               </div>
