@@ -87,13 +87,14 @@ export default function TodayPage() {
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
 
-  // Elder & Child-Friendly Extra Items State
+  // Extra Items State (Matching User's Dropdown & Custom Item Specification)
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
-  const [isAddingCustom, setIsAddingCustom] = useState(false);
-  const [customItemName, setCustomItemName] = useState('');
-  const [customItemUnit, setCustomItemUnit] = useState<UnitType>('count');
-  const [customItemPrice, setCustomItemPrice] = useState<number>(40);
-  const [customItemQty, setCustomItemQty] = useState<number>(1);
+  const [isNewProductMode, setIsNewProductMode] = useState(false);
+  const [selectedExtraProduct, setSelectedExtraProduct] = useState('Fresh Malai Paneer');
+  const [extraItemName, setExtraItemName] = useState('Fresh Malai Paneer');
+  const [extraItemQty, setExtraItemQty] = useState<number>(1);
+  const [extraItemUnit, setExtraItemUnit] = useState<UnitType>('kilogram');
+  const [extraItemPrice, setExtraItemPrice] = useState<number>(380);
   const [saveCustomToCatalog, setSaveCustomToCatalog] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -142,7 +143,16 @@ export default function TodayPage() {
     setPhotoDataUrl(null);
     setEntryNotes('');
     setExtraItems([]);
-    setIsAddingCustom(false);
+    setIsNewProductMode(false);
+
+    if (availableProductsList.length > 0) {
+      const p = availableProductsList[0];
+      setSelectedExtraProduct(p.name);
+      setExtraItemName(p.name);
+      setExtraItemUnit(p.unit);
+      setExtraItemPrice(p.defaultPrice);
+      setExtraItemQty(p.unit === 'kilogram' ? 0.5 : 1);
+    }
     setIsModalOpen(true);
   };
 
@@ -207,31 +217,63 @@ export default function TodayPage() {
     { name: 'Masala Chaas', unit: 'count' as UnitType, defaultPrice: 15, emoji: '🥛' },
   ];
 
-  const availableExtraProducts = [...catalogExtraProducts];
+  const availableProductsList = [...catalogExtraProducts];
   for (const staple of standardDairyStaples) {
-    if (!availableExtraProducts.some((p) => p.name.toLowerCase().includes(staple.name.toLowerCase().split(' ')[0]))) {
-      availableExtraProducts.push(staple);
+    if (!availableProductsList.some((p) => p.name.toLowerCase().includes(staple.name.toLowerCase().split(' ')[0]))) {
+      availableProductsList.push(staple);
     }
   }
 
-  // 1-Tap Toggle or Add Extra Item from horizontal scroll track
-  const handleToggleOrAddExtra = (prod: { name: string; unit: UnitType; defaultPrice: number; emoji: string }) => {
-    const existingIndex = extraItems.findIndex((i) => i.name === prod.name);
-    if (existingIndex >= 0) {
-      const step = prod.unit === 'kilogram' ? 0.25 : 1;
-      const updated = [...extraItems];
-      updated[existingIndex].quantity = parseFloat((updated[existingIndex].quantity + step).toFixed(2));
-      setExtraItems(updated);
-    } else {
-      const initialQty = prod.unit === 'kilogram' ? 0.5 : 1;
-      const newItem: ExtraItem = {
-        id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        name: prod.name,
-        quantity: initialQty,
-        unit: prod.unit,
-        price: prod.defaultPrice,
-      };
-      setExtraItems([...extraItems, newItem]);
+  // Add selected or typed extra item into today's bundle
+  const handleDirectAddExtraItem = () => {
+    const finalName = (isNewProductMode ? extraItemName : selectedExtraProduct).trim();
+    if (!finalName) {
+      alert('Please enter or select a product.');
+      return;
+    }
+
+    if (isNewProductMode && saveCustomToCatalog && dairyVendor && household) {
+      addProduct({
+        household_id: household.id,
+        vendor_id: dairyVendor.id,
+        name: finalName,
+        unit_type: extraItemUnit,
+        default_price: extraItemPrice,
+        is_milk_type: false,
+      });
+    }
+
+    const newItem: ExtraItem = {
+      id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: finalName,
+      quantity: extraItemQty,
+      unit: extraItemUnit,
+      price: extraItemPrice,
+    };
+
+    setExtraItems((prev) => [...prev, newItem]);
+
+    // Reset form to first option in list
+    setIsNewProductMode(false);
+    if (availableProductsList.length > 0) {
+      const p = availableProductsList[0];
+      setSelectedExtraProduct(p.name);
+      setExtraItemName(p.name);
+      setExtraItemUnit(p.unit);
+      setExtraItemPrice(p.defaultPrice);
+      setExtraItemQty(p.unit === 'kilogram' ? 0.5 : 1);
+    }
+  };
+
+  const handleResetExtraForm = () => {
+    setIsNewProductMode(false);
+    if (availableProductsList.length > 0) {
+      const p = availableProductsList[0];
+      setSelectedExtraProduct(p.name);
+      setExtraItemName(p.name);
+      setExtraItemUnit(p.unit);
+      setExtraItemPrice(p.defaultPrice);
+      setExtraItemQty(1);
     }
   };
 
@@ -251,40 +293,6 @@ export default function TodayPage() {
   // Remove extra item
   const handleRemoveExtraItem = (id: string) => {
     setExtraItems((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  // Add custom / new product created on the fly
-  const handleAddCustomItem = () => {
-    const trimmedName = customItemName.trim();
-    if (!trimmedName || customItemPrice <= 0) {
-      alert('Please enter a product name and valid price.');
-      return;
-    }
-
-    if (saveCustomToCatalog && dairyVendor && household) {
-      addProduct({
-        household_id: household.id,
-        vendor_id: dairyVendor.id,
-        name: trimmedName,
-        unit_type: customItemUnit,
-        default_price: customItemPrice,
-        is_milk_type: false,
-      });
-    }
-
-    const newItem: ExtraItem = {
-      id: `ex_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: trimmedName,
-      quantity: customItemQty,
-      unit: customItemUnit,
-      price: customItemPrice,
-    };
-
-    setExtraItems((prev) => [...prev, newItem]);
-    setIsAddingCustom(false);
-    setCustomItemName('');
-    setCustomItemPrice(40);
-    setCustomItemQty(1);
   };
 
   // Total price calculation
@@ -1175,263 +1183,269 @@ export default function TodayPage() {
                 </div>
               </div>
 
-              {/* Extra Items Section: Scrollable Quick Pick Carousel + Bundled List */}
-              <div className="extra-quick-picker">
-                <div className="quick-picker-header">
-                  <div>
-                    <div className="quick-picker-title">
-                      <span>🛒</span> {t.today.addItems}
+              {/* Extra Items Section: Dropdown of Existing Products + New Product Mode */}
+              <div className="extra-items-box">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span>🛒</span> {t.today.addItems}
+                  </span>
+                  {!isNewProductMode ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsNewProductMode(true);
+                        setExtraItemName('');
+                        setExtraItemPrice(0);
+                        setExtraItemQty(1);
+                      }}
+                      style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 700, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                      id="btn-switch-new-product"
+                    >
+                      <Plus size={14} /> + New Product
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsNewProductMode(false);
+                        if (availableProductsList.length > 0) {
+                          const p = availableProductsList[0];
+                          setSelectedExtraProduct(p.name);
+                          setExtraItemName(p.name);
+                          setExtraItemUnit(p.unit);
+                          setExtraItemPrice(p.defaultPrice);
+                          setExtraItemQty(p.unit === 'kilogram' ? 0.5 : 1);
+                        }
+                      }}
+                      style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 700, background: 'transparent', cursor: 'pointer' }}
+                      id="btn-switch-options"
+                    >
+                      ← Select Existing Option
+                    </button>
+                  )}
+                </div>
+
+                {/* Row 1: Product Selector (Dropdown) or Custom Name Input */}
+                <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{isNewProductMode ? 'Type Product Name' : 'Select Product from Options'}</span>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.72rem' }}>
+                      {isNewProductMode ? 'New custom item' : 'Catalog products'}
+                    </span>
+                  </label>
+
+                  {!isNewProductMode ? (
+                    <select
+                      value={selectedExtraProduct}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '__custom__') {
+                          setIsNewProductMode(true);
+                          setExtraItemName('');
+                          setExtraItemPrice(0);
+                          setExtraItemQty(1);
+                        } else {
+                          setSelectedExtraProduct(val);
+                          const found = availableProductsList.find((p) => p.name === val);
+                          if (found) {
+                            setExtraItemName(found.name);
+                            setExtraItemUnit(found.unit);
+                            setExtraItemPrice(found.defaultPrice);
+                            setExtraItemQty(found.unit === 'kilogram' ? 0.5 : 1);
+                          }
+                        }
+                      }}
+                      className="form-select"
+                      style={{ fontSize: '0.92rem', padding: '0.55rem 0.75rem', fontWeight: 600 }}
+                      id="select-extra-product"
+                    >
+                      {availableProductsList.map((prod) => (
+                        <option key={prod.name} value={prod.name}>
+                          {prod.emoji} {prod.name} (₹{prod.defaultPrice} / {prod.unit === 'kilogram' ? 'kg' : prod.unit === 'litre' ? 'L' : 'pkt'})
+                        </option>
+                      ))}
+                      <option value="__custom__">➕ + Add New Product (Type custom name)...</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="e.g. Buffalo Butter, Khoya, Paneer..."
+                      value={extraItemName}
+                      onChange={(e) => setExtraItemName(e.target.value)}
+                      className="form-input"
+                      style={{ fontSize: '0.92rem', padding: '0.55rem 0.75rem' }}
+                      id="input-new-extra-name"
+                      autoFocus
+                    />
+                  )}
+                </div>
+
+                {/* Row 2: Quantity | Unit / Weight | Price (₹) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.6rem', marginBottom: '0.85rem' }}>
+                  {/* Quantity */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Quantity</label>
+                    <div className="mini-stepper" style={{ background: '#ffffff', border: '1.5px solid var(--border-glass)', padding: '0.2rem 0.3rem', height: 42 }}>
+                      <button
+                        type="button"
+                        className="mini-step-btn"
+                        onClick={() => {
+                          const step = extraItemUnit === 'kilogram' ? 0.25 : 1;
+                          setExtraItemQty((q) => Math.max(step, parseFloat((q - step).toFixed(2))));
+                        }}
+                        style={{ width: 28, height: 28, fontSize: '1rem' }}
+                        aria-label="Decrease quantity"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        step={extraItemUnit === 'kilogram' ? '0.25' : '1'}
+                        min={extraItemUnit === 'kilogram' ? '0.25' : '1'}
+                        value={extraItemQty}
+                        onChange={(e) => setExtraItemQty(parseFloat(e.target.value) || 1)}
+                        style={{ width: '100%', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 800, fontSize: '0.95rem', outline: 'none' }}
+                      />
+                      <button
+                        type="button"
+                        className="mini-step-btn"
+                        onClick={() => {
+                          const step = extraItemUnit === 'kilogram' ? 0.25 : 1;
+                          setExtraItemQty((q) => parseFloat((q + step).toFixed(2)));
+                        }}
+                        style={{ width: 28, height: 28, fontSize: '1rem' }}
+                        aria-label="Increase quantity"
+                      >
+                        +
+                      </button>
                     </div>
-                    <div className="quick-picker-sub">
-                      {t.today.quickPickSubtitle}
+                  </div>
+
+                  {/* Unit / Weight */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Unit / Weight</label>
+                    <select
+                      value={extraItemUnit}
+                      onChange={(e) => setExtraItemUnit(e.target.value as UnitType)}
+                      className="form-select"
+                      style={{ fontSize: '0.85rem', padding: '0.45rem 0.5rem', height: 42 }}
+                    >
+                      <option value="kilogram">kg (Kilogram)</option>
+                      <option value="litre">L (Litre)</option>
+                      <option value="count">Pkt / Unit</option>
+                    </select>
+                  </div>
+
+                  {/* Price with ₹ symbol */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Price (₹)</label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ position: 'absolute', left: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={extraItemPrice}
+                        onChange={(e) => setExtraItemPrice(parseFloat(e.target.value) || 0)}
+                        className="form-input"
+                        style={{ paddingLeft: '1.6rem', paddingRight: '0.5rem', fontSize: '0.95rem', fontWeight: 700, height: 42 }}
+                        id="input-extra-price"
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* Horizontal Scrollable Carousel for Elders & Kids */}
-                <div className="quick-carousel-track" role="region" aria-label="Extra items quick picker">
-                  {availableExtraProducts.map((prod) => {
-                    const matchedItem = extraItems.find((i) => i.name === prod.name);
-                    const isSelected = !!matchedItem;
-                    return (
-                      <button
-                        key={prod.name}
-                        type="button"
-                        onClick={() => handleToggleOrAddExtra(prod)}
-                        className={`quick-item-card ${isSelected ? 'active' : ''}`}
-                        title={`Tap to add ${prod.name}`}
-                      >
-                        <span className="quick-item-emoji">{prod.emoji}</span>
-                        <span className="quick-item-name">{prod.name}</span>
-                        <span className="quick-item-price">
-                          ₹{prod.defaultPrice} <small>/{prod.unit === 'kilogram' ? 'kg' : prod.unit === 'litre' ? 'L' : 'pkt'}</small>
-                        </span>
-                        <span className={`quick-item-btn-tag ${isSelected ? 'added' : ''}`}>
-                          {isSelected ? `✓ Added (${matchedItem?.quantity})` : '+ Add'}
-                        </span>
-                      </button>
-                    );
-                  })}
+                {/* If New Product Mode: Save to catalog checkbox */}
+                {isNewProductMode && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.76rem', color: 'var(--text-secondary)', cursor: 'pointer', marginBottom: '0.65rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={saveCustomToCatalog}
+                      onChange={(e) => setSaveCustomToCatalog(e.target.checked)}
+                      style={{ accentColor: 'var(--primary)', width: 15, height: 15 }}
+                    />
+                    <span>{t.today.saveToCatalog}</span>
+                  </label>
+                )}
 
-                  {/* + New / Custom Item Card at the end of the scroll track */}
+                {/* Row 3: Action Buttons */}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
                     type="button"
-                    onClick={() => setIsAddingCustom(!isAddingCustom)}
-                    className="quick-item-card new-item-card"
-                    title="Add a new custom product"
+                    onClick={handleDirectAddExtraItem}
+                    className="btn-primary"
+                    style={{ flex: 1, padding: '0.65rem', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                    id="btn-add-to-bundle"
                   >
-                    <span className="quick-item-emoji">➕</span>
-                    <span className="quick-item-name">{t.today.customItemTitle}</span>
-                    <span className="quick-item-price"><small>Custom rate</small></span>
-                    <span className="quick-item-btn-tag">+ Create</span>
+                    <span>Add to bundle</span>
+                    <span style={{ opacity: 0.95, fontSize: '0.85rem', fontWeight: 800, background: 'rgba(255,255,255,0.2)', padding: '0.15rem 0.45rem', borderRadius: 4 }}>
+                      ₹{Math.round(extraItemPrice * extraItemQty)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetExtraForm}
+                    className="btn-secondary"
+                    style={{ padding: '0.65rem 1.1rem', fontSize: '0.85rem' }}
+                    id="btn-cancel-extra-form"
+                  >
+                    Cancel
                   </button>
                 </div>
 
-                {/* Expandable Custom Item Form if "+ New Item" is clicked */}
-                {isAddingCustom && (
-                  <div className="custom-extra-sheet">
-                    <div className="custom-sheet-header">
-                      <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                        {t.today.customItemTitle}
-                      </strong>
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingCustom(false)}
-                        style={{ color: 'var(--text-muted)', background: 'transparent' }}
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-
-                    {/* Quick suggestion chips */}
-                    <div className="quick-suggestions-row">
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Quick tap:</span>
-                      {[
-                        { label: 'White Butter', price: 50, unit: 'count' as UnitType },
-                        { label: 'Masala Chaas', price: 15, unit: 'count' as UnitType },
-                        { label: 'Khoya / Mawa', price: 320, unit: 'kilogram' as UnitType },
-                        { label: 'Cheese Slices', price: 140, unit: 'count' as UnitType },
-                        { label: 'Sweets / Peda', price: 260, unit: 'kilogram' as UnitType },
-                      ].map((sugg) => (
-                        <button
-                          key={sugg.label}
-                          type="button"
-                          className="chip-btn"
-                          onClick={() => {
-                            setCustomItemName(sugg.label);
-                            setCustomItemPrice(sugg.price);
-                            setCustomItemUnit(sugg.unit);
-                          }}
-                        >
-                          + {sugg.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.45rem' }}>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Item Name</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Buffalo Butter, Khoya, Chaas..."
-                          value={customItemName}
-                          onChange={(e) => setCustomItemName(e.target.value)}
-                          className="form-input"
-                          style={{ padding: '0.45rem 0.65rem', fontSize: '0.85rem' }}
-                        />
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.45rem' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label className="form-label" style={{ fontSize: '0.75rem' }}>Unit Type</label>
-                          <select
-                            value={customItemUnit}
-                            onChange={(e) => setCustomItemUnit(e.target.value as UnitType)}
-                            className="form-select"
-                            style={{ padding: '0.45rem 0.65rem', fontSize: '0.82rem' }}
-                          >
-                            <option value="count">Packets / Units</option>
-                            <option value="kilogram">Kilograms (kg)</option>
-                            <option value="litre">Litres (L)</option>
-                          </select>
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label className="form-label" style={{ fontSize: '0.75rem' }}>Unit Price (₹)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={customItemPrice}
-                            onChange={(e) => setCustomItemPrice(parseFloat(e.target.value) || 0)}
-                            className="form-input"
-                            style={{ padding: '0.45rem 0.65rem', fontSize: '0.85rem' }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Quantity Stepper */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Quantity:</span>
-                        <div className="mini-stepper">
-                          <button
-                            type="button"
-                            className="mini-step-btn"
-                            onClick={() =>
-                              setCustomItemQty((q) =>
-                                Math.max(customItemUnit === 'kilogram' ? 0.25 : 1, parseFloat((q - (customItemUnit === 'kilogram' ? 0.25 : 1)).toFixed(2)))
-                              )
-                            }
-                          >
-                            -
-                          </button>
-                          <span className="mini-step-val">
-                            {customItemQty} <small>{customItemUnit === 'kilogram' ? 'kg' : customItemUnit === 'litre' ? 'L' : 'pkt'}</small>
-                          </span>
-                          <button
-                            type="button"
-                            className="mini-step-btn"
-                            onClick={() =>
-                              setCustomItemQty((q) =>
-                                parseFloat((q + (customItemUnit === 'kilogram' ? 0.25 : 1)).toFixed(2))
-                              )
-                            }
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--primary)' }}>
-                          ₹{Math.round(customItemPrice * customItemQty)}
-                        </span>
-                      </div>
-
-                      {/* Save to product catalog checkbox */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.76rem', color: 'var(--text-secondary)', cursor: 'pointer', margin: '0.2rem 0' }}>
-                        <input
-                          type="checkbox"
-                          checked={saveCustomToCatalog}
-                          onChange={(e) => setSaveCustomToCatalog(e.target.checked)}
-                          style={{ accentColor: 'var(--primary)', width: 15, height: 15 }}
-                        />
-                        <span>{t.today.saveToCatalog}</span>
-                      </label>
-
-                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
-                        <button
-                          type="button"
-                          onClick={handleAddCustomItem}
-                          className="btn-primary"
-                          style={{ flex: 1, padding: '0.5rem', fontSize: '0.82rem' }}
-                        >
-                          Add to Today's Delivery (₹{Math.round(customItemPrice * customItemQty)})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsAddingCustom(false)}
-                          className="btn-secondary"
-                          style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem' }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Included Extra Items List */}
                 {extraItems.length > 0 && (
-                  <div className="bundled-extras-container">
+                  <div className="bundled-extras-container" style={{ marginTop: '0.85rem', borderTop: '1.5px dashed #cbd5e1', paddingTop: '0.75rem' }}>
                     <div className="bundled-extras-header">
                       <span>📦 {t.today.includedItems} ({extraItems.length}):</span>
                       <span style={{ color: 'var(--primary)', fontWeight: 800 }}>+₹{extraTotal}</span>
                     </div>
 
-                    {extraItems.map((item) => {
-                      const step = item.unit === 'kilogram' ? 0.25 : 1;
-                      const itemTotal = Math.round(item.price * item.quantity);
-                      return (
-                        <div key={item.id} className="bundled-item-row">
-                          <div className="bundled-item-info">
-                            <span className="bundled-item-name">
-                              {getItemEmoji(item.name)} {item.name}
-                            </span>
-                            <div className="bundled-item-calc">
-                              ₹{item.price}/{item.unit === 'kilogram' ? 'kg' : item.unit === 'litre' ? 'L' : 'pkt'} × {item.quantity} = <strong>₹{itemTotal}</strong>
-                            </div>
-                          </div>
-
-                          <div className="bundled-item-actions">
-                            <div className="mini-stepper">
-                              <button
-                                type="button"
-                                className="mini-step-btn"
-                                onClick={() => handleUpdateExtraQty(item.id, -step)}
-                                aria-label="Decrease quantity"
-                              >
-                                -
-                              </button>
-                              <span className="mini-step-val">
-                                {item.quantity} <small>{item.unit === 'kilogram' ? 'kg' : item.unit === 'litre' ? 'L' : 'pkt'}</small>
-                              </span>
-                              <button
-                                type="button"
-                                className="mini-step-btn"
-                                onClick={() => handleUpdateExtraQty(item.id, step)}
-                                aria-label="Increase quantity"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveExtraItem(item.id)}
-                              className="mini-delete-btn"
-                              aria-label="Remove item"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                    {extraItems.map((item) => (
+                      <div key={item.id} className="bundled-item-row">
+                        <div className="bundled-item-info">
+                          <span className="bundled-item-name">
+                            {getItemEmoji(item.name)} {item.name}
+                          </span>
+                          <div className="bundled-item-calc">
+                            {item.quantity} {item.unit === 'kilogram' ? 'kg' : item.unit === 'litre' ? 'L' : 'pkt'} × ₹{item.price} = <strong>₹{Math.round(item.price * item.quantity)}</strong>
                           </div>
                         </div>
-                      );
-                    })}
+
+                        <div className="bundled-item-actions">
+                          <div className="mini-stepper">
+                            <button
+                              type="button"
+                              className="mini-step-btn"
+                              onClick={() => handleUpdateExtraQty(item.id, -(item.unit === 'kilogram' ? 0.25 : 1))}
+                              aria-label="Decrease quantity"
+                            >
+                              -
+                            </button>
+                            <span className="mini-step-val">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              className="mini-step-btn"
+                              onClick={() => handleUpdateExtraQty(item.id, (item.unit === 'kilogram' ? 0.25 : 1))}
+                              aria-label="Increase quantity"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExtraItem(item.id)}
+                            className="mini-delete-btn"
+                            aria-label="Remove item"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

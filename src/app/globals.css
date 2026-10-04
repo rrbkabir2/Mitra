@@ -794,6 +794,15 @@ button {
   padding: 0.5rem;
 }
 
+/* Extra Items Box */
+.extra-items-box {
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: var(--radius-lg);
+  padding: 0.95rem;
+  margin-bottom: 1.15rem;
+}
+
 /* Extra Items Quick Picker (Elder & Child Friendly) */
 .extra-quick-picker {
   background: #f8fafc;
