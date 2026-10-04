@@ -410,16 +410,16 @@ button {
 
 .quantity-card {
   background: var(--bg-card);
-  border: 1.5px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem 1rem;
+  border: 1.5px solid #e5e2d9;
+  border-radius: var(--radius-xl);
+  padding: 1.4rem 1rem 1.1rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 0.5rem;
-  box-shadow: var(--shadow-sm);
+  gap: 0.65rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
   transition: all var(--transition-bounce);
   cursor: pointer;
   position: relative;
@@ -427,25 +427,182 @@ button {
 }
 
 .quantity-card:hover {
-  transform: translateY(-4px);
-  border-color: #93c5fd;
-  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  transform: translateY(-3px);
+  border-color: #2d6a4f;
+  box-shadow: 0 10px 20px -5px rgba(27, 67, 50, 0.1);
 }
 
 .quantity-card:active {
   transform: scale(0.97);
 }
 
-.quantity-card-bottle-icon {
+/* Figma Pill Badge inside Card */
+.figma-pill-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: #e8f3ed;
+  border: 1.5px solid #1b4332;
+  color: #1b4332;
+  font-weight: 800;
+  line-height: 1.1;
+  transition: all var(--transition-fast);
+}
+
+.figma-pill-badge .pill-num {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.figma-pill-badge .pill-unit {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.quantity-card:hover .figma-pill-badge {
+  background: #1b4332;
+  color: #ffffff;
+}
+
+.quantity-card-label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+
+/* Absent Pill Variant */
+.figma-pill-badge.absent {
+  background: #f7f3ee;
+  border-color: #78716c;
+  color: #78716c;
+}
+
+.quantity-card.absent-card:hover .figma-pill-badge.absent {
+  background: #78716c;
+  color: #ffffff;
+}
+
+/* Figma In-Between Feature Cards (Products & Vendors, Send Purchase) */
+.figma-feature-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 2rem;
+}
+
+.figma-feature-card {
+  background: #ffffff;
+  border: 1.5px solid #e5e2d9;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.figma-feature-card:hover {
+  border-color: #2d6a4f;
+}
+
+.figma-feature-header {
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  background: #ffffff;
+  transition: background 0.15s ease;
+}
+
+.figma-feature-header:hover {
+  background: #fcfbf9;
+}
+
+.figma-feature-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.figma-feature-icon-circle {
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-full);
-  background: var(--primary-light);
-  color: var(--primary);
+  border-radius: 50%;
+  border: 1.5px solid #1b4332;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #1b4332;
+  flex-shrink: 0;
+  background: #ffffff;
+}
+
+.figma-feature-text h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1b4332;
+  letter-spacing: -0.01em;
+}
+
+.figma-feature-text p {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 0.15rem;
+}
+
+.figma-feature-chevron {
+  color: #6b7280;
+  transition: transform 0.25s ease;
+}
+
+.figma-feature-chevron.open {
+  transform: rotate(180deg);
+}
+
+.figma-feature-body {
+  border-top: 1px solid #f1eee7;
+  padding: 1.25rem;
+  background: #faf9f6;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Month/Year Filter Toolbar */
+.filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.filter-pill-group {
+  display: inline-flex;
+  background: #f1eee7;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  gap: 3px;
+}
+
+.filter-pill-btn {
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #6b7280;
   transition: all var(--transition-fast);
+}
+
+.filter-pill-btn.active {
+  background: #1b4332;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .quantity-card:hover .quantity-card-bottle-icon {

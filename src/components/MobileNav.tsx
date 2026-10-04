@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMitra } from '@/context/MitraContext';
-import { Calendar, History, FileText, Settings, Tag } from 'lucide-react';
+import { Home, ListOrdered, IndianRupee, BarChart3, Settings } from 'lucide-react';
 
 export const MobileNav: React.FC = () => {
   const pathname = usePathname();
@@ -22,8 +22,8 @@ export const MobileNav: React.FC = () => {
         className={`mobile-nav-item ${pathname === '/' ? 'active' : ''}`}
         id="mobile-nav-today"
       >
-        <Calendar size={20} />
-        <span>{t.nav.today}</span>
+        <Home size={20} />
+        <span>Home</span>
       </Link>
 
       <Link
@@ -31,8 +31,8 @@ export const MobileNav: React.FC = () => {
         className={`mobile-nav-item ${pathname === '/history' ? 'active' : ''}`}
         id="mobile-nav-history"
       >
-        <History size={20} />
-        <span>{t.nav.history}</span>
+        <ListOrdered size={20} />
+        <span>History</span>
       </Link>
 
       <Link
@@ -40,8 +40,8 @@ export const MobileNav: React.FC = () => {
         className={`mobile-nav-item ${pathname === '/pricing' ? 'active' : ''}`}
         id="mobile-nav-pricing"
       >
-        <Tag size={20} />
-        <span>{t.nav.pricing}</span>
+        <IndianRupee size={19} />
+        <span>Rate</span>
       </Link>
 
       <Link
@@ -49,8 +49,8 @@ export const MobileNav: React.FC = () => {
         className={`mobile-nav-item ${pathname === '/reports' ? 'active' : ''}`}
         id="mobile-nav-reports"
       >
-        <FileText size={20} />
-        <span>{t.nav.reports}</span>
+        <BarChart3 size={20} />
+        <span>Report</span>
       </Link>
 
       <Link
@@ -59,7 +59,7 @@ export const MobileNav: React.FC = () => {
         id="mobile-nav-settings"
       >
         <Settings size={20} />
-        <span>{t.nav.settings}</span>
+        <span>Settings</span>
       </Link>
     </nav>
   );

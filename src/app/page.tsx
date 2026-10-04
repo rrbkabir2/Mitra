@@ -22,6 +22,15 @@ import {
   Eye,
   Sliders,
   Ban,
+  ChevronDown,
+  ChevronUp,
+  IndianRupee,
+  Users,
+  Copy,
+  Check,
+  ExternalLink,
+  Calendar as CalendarIcon,
+  Filter,
 } from 'lucide-react';
 
 export default function TodayPage() {
@@ -34,10 +43,31 @@ export default function TodayPage() {
     isAdminLoggedIn,
     addDeliveryEntry,
     markTodayAbsent,
+    addPurchase,
   } = useMitra();
 
   // Selected Milk Subtype
   const [selectedSubtype, setSelectedSubtype] = useState<MilkSubtype>('cow');
+
+  // Expandable In-Between Cards State (Matching Figma)
+  const [isProductsVendorsOpen, setIsProductsVendorsOpen] = useState(false);
+  const [isSendPurchaseOpen, setIsSendPurchaseOpen] = useState(false);
+
+  // Inline Send Purchase Form State
+  const [inlinePurchaseName, setInlinePurchaseName] = useState('');
+  const [inlinePurchaseQty, setInlinePurchaseQty] = useState(1);
+  const [inlinePurchasePrice, setInlinePurchasePrice] = useState(250);
+  const [inlinePurchasePhoto, setInlinePurchasePhoto] = useState<string | null>(null);
+  const [isSubmittingInlinePurchase, setIsSubmittingInlinePurchase] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
+
+  // Month / Year Filter State for Deliveries
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentYearStr = String(now.getFullYear());
+  const [deliveryFilter, setDeliveryFilter] = useState<'today' | 'month' | 'year' | 'all'>('today');
+  const [filterMonth, setFilterMonth] = useState<string>(currentMonthStr);
+  const [filterYear, setFilterYear] = useState<string>(currentYearStr);
 
   // Quick Entry Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,6 +93,7 @@ export default function TodayPage() {
   const [newExtraPrice, setNewExtraPrice] = useState(40);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const inlinePhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   // If admin is not logged in, show login prompt
   if (!isAdminLoggedIn) {
@@ -261,9 +292,84 @@ export default function TodayPage() {
     }
   };
 
-  // Entries logged today
-  const todayDateStr = new Date().toISOString().split('T')[0];
-  const todayEntries = entries.filter((e) => e.entry_date === todayDateStr);
+  // Date string & banner
+  const todayDateStr = now.toISOString().split('T')[0];
+  const formattedDateBanner = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).toUpperCase();
+
+  // Filtered Deliveries based on Today / Month / Year
+  const filteredEntries = entries.filter((e) => {
+    if (deliveryFilter === 'today') return e.entry_date === todayDateStr;
+    if (deliveryFilter === 'month') return e.entry_date.startsWith(filterMonth);
+    if (deliveryFilter === 'year') return e.entry_date.startsWith(filterYear);
+    return true;
+  });
+
+  const filteredLitres = filteredEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+  const filteredAmount = filteredEntries.reduce((acc, curr) => acc + (curr.total_price || 0), 0);
+
+  // Copy Vendor Token Link
+  const handleCopyVendorToken = () => {
+    if (!dairyVendor) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    navigator.clipboard.writeText(`${origin}/v/${dairyVendor.access_token}`);
+    setCopiedToken(true);
+    setTimeout(() => setCopiedToken(false), 3000);
+  };
+
+  // Inline Photo Upload Handler
+  const handleInlinePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const res = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.75 });
+      setInlinePurchasePhoto(res.dataUrl);
+    } catch (err) {
+      console.error('Photo compress error:', err);
+    }
+  };
+
+  // Submit Inline One-Time Purchase
+  const handleInlinePurchaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inlinePurchaseName || !dairyVendor) return;
+
+    setIsSubmittingInlinePurchase(true);
+    try {
+      await addPurchase({
+        household_id: household.id,
+        vendor_id: dairyVendor.id,
+        product_name: inlinePurchaseName,
+        quantity: inlinePurchaseQty,
+        total_price: inlinePurchasePrice,
+        photo_url: inlinePurchasePhoto,
+        date: todayDateStr,
+        vendor_name: dairyVendor.name,
+      });
+
+      setInlinePurchaseName('');
+      setInlinePurchaseQty(1);
+      setInlinePurchasePrice(250);
+      setInlinePurchasePhoto(null);
+      setIsSendPurchaseOpen(false);
+
+      setSuccessToast({
+        show: true,
+        message: 'Purchase recorded & sent via WhatsApp!',
+        details: `One-time item "${inlinePurchaseName}" (₹${inlinePurchasePrice}) sent to ${dairyVendor.name}.`,
+      });
+      setTimeout(() => setSuccessToast(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error sending purchase';
+      alert(msg);
+    } finally {
+      setIsSubmittingInlinePurchase(false);
+    }
+  };
 
   return (
     <main className="main-content" id="today-main-page">
@@ -310,50 +416,78 @@ export default function TodayPage() {
       {/* Trust Safeguard Notice */}
       <TrustSafeguardBanner />
 
-      {/* Today Section Header */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-          {t.today.title}
+      {/* Today Section Header (Matching Figma) */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div
+          style={{
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            color: '#1b4332',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            marginBottom: '0.35rem',
+          }}
+        >
+          {formattedDateBanner}
+        </div>
+        <h2 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827' }}>
+          Today's milk
         </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '0.2rem' }}>
-          {t.today.subtitle}
+        <p style={{ color: '#6b7280', fontSize: '0.95rem', marginTop: '0.15rem' }}>
+          How much milk arrived today?
         </p>
       </div>
 
-      {/* Milk Type Toggle (Cow / Buffalo) */}
-      <div className="milk-selector-toggle" role="group" aria-label="Milk Variety Selector">
-        <button
-          type="button"
-          className={`milk-toggle-btn ${selectedSubtype === 'cow' ? 'active' : ''}`}
-          onClick={() => setSelectedSubtype('cow')}
-          id="btn-select-cow-milk"
-        >
-          <MilkBottleIcon size={16} fillColor={selectedSubtype === 'cow' ? '#2563eb' : '#64748b'} />
-          <span>{t.today.cowMilk}</span>
-          <span className="rate-badge">
-            ₹{products.find((p) => p.milk_subtype === 'cow')?.default_price || 60}
-            {t.today.perLitre}
-          </span>
-        </button>
+      {/* Quick Quantities Header & Milk Type Toggle */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          marginBottom: '1rem',
+        }}
+      >
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#111827' }}>
+          Quick quantities
+        </h3>
 
-        <button
-          type="button"
-          className={`milk-toggle-btn ${selectedSubtype === 'buffalo' ? 'active' : ''}`}
-          onClick={() => setSelectedSubtype('buffalo')}
-          id="btn-select-buffalo-milk"
-        >
-          <MilkBottleIcon size={16} fillColor={selectedSubtype === 'buffalo' ? '#2563eb' : '#64748b'} />
-          <span>{t.today.buffaloMilk}</span>
-          <span className="rate-badge">
-            ₹{products.find((p) => p.milk_subtype === 'buffalo')?.default_price || 75}
-            {t.today.perLitre}
-          </span>
-        </button>
+        {/* Milk Type Toggle (Cow / Buffalo) */}
+        <div className="milk-selector-toggle" role="group" aria-label="Milk Variety Selector" style={{ margin: 0 }}>
+          <button
+            type="button"
+            className={`milk-toggle-btn ${selectedSubtype === 'cow' ? 'active' : ''}`}
+            onClick={() => setSelectedSubtype('cow')}
+            id="btn-select-cow-milk"
+          >
+            <MilkBottleIcon size={16} fillColor={selectedSubtype === 'cow' ? '#1b4332' : '#64748b'} />
+            <span>{t.today.cowMilk}</span>
+            <span className="rate-badge">
+              ₹{products.find((p) => p.milk_subtype === 'cow')?.default_price || 60}
+              {t.today.perLitre}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`milk-toggle-btn ${selectedSubtype === 'buffalo' ? 'active' : ''}`}
+            onClick={() => setSelectedSubtype('buffalo')}
+            id="btn-select-buffalo-milk"
+          >
+            <MilkBottleIcon size={16} fillColor={selectedSubtype === 'buffalo' ? '#1b4332' : '#64748b'} />
+            <span>{t.today.buffaloMilk}</span>
+            <span className="rate-badge">
+              ₹{products.find((p) => p.milk_subtype === 'buffalo')?.default_price || 75}
+              {t.today.perLitre}
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* 3x2 Canonical Quantity Grid */}
-      <section className="quantity-grid" aria-label="Quick Quantity Selection Grid">
-        {/* 0.5 Litre */}
+      {/* 3x2 Canonical Quantity Grid (Matching Figma Pill Badges) */}
+      <section className="quantity-grid" aria-label="Quick Quantity Selection Grid" style={{ marginBottom: '1.5rem' }}>
+        {/* 0.5 Litre (½ L) */}
         <div
           className="quantity-card"
           onClick={() => handleQuantitySelect(0.5)}
@@ -361,14 +495,17 @@ export default function TodayPage() {
           tabIndex={0}
           id="card-qty-0-5"
         >
-          <div className="quantity-card-bottle-icon">
-            <MilkBottleIcon size={26} />
+          <div className="figma-pill-badge">
+            <span className="pill-num">½</span>
+            <span className="pill-unit">L</span>
           </div>
-          <div className="quantity-number">{t.today.grid.halfLitre}</div>
-          <div className="quantity-price-preview">₹{(0.5 * currentRate).toFixed(0)}</div>
+          <div className="quantity-card-label">½ litre</div>
+          <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 600 }}>
+            ₹{(0.5 * currentRate).toFixed(0)}
+          </div>
         </div>
 
-        {/* 1.0 Litre */}
+        {/* 1.0 Litre (1 L) */}
         <div
           className="quantity-card"
           onClick={() => handleQuantitySelect(1.0)}
@@ -376,14 +513,17 @@ export default function TodayPage() {
           tabIndex={0}
           id="card-qty-1-0"
         >
-          <div className="quantity-card-bottle-icon">
-            <MilkBottleIcon size={26} />
+          <div className="figma-pill-badge">
+            <span className="pill-num">1</span>
+            <span className="pill-unit">L</span>
           </div>
-          <div className="quantity-number">{t.today.grid.oneLitre}</div>
-          <div className="quantity-price-preview">₹{(1.0 * currentRate).toFixed(0)}</div>
+          <div className="quantity-card-label">1 litre</div>
+          <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 600 }}>
+            ₹{(1.0 * currentRate).toFixed(0)}
+          </div>
         </div>
 
-        {/* 1.5 Litres */}
+        {/* 1.5 Litres (1½ L) */}
         <div
           className="quantity-card"
           onClick={() => handleQuantitySelect(1.5)}
@@ -391,14 +531,17 @@ export default function TodayPage() {
           tabIndex={0}
           id="card-qty-1-5"
         >
-          <div className="quantity-card-bottle-icon">
-            <MilkBottleIcon size={26} />
+          <div className="figma-pill-badge">
+            <span className="pill-num">1½</span>
+            <span className="pill-unit">L</span>
           </div>
-          <div className="quantity-number">{t.today.grid.onePointFiveLitre}</div>
-          <div className="quantity-price-preview">₹{(1.5 * currentRate).toFixed(0)}</div>
+          <div className="quantity-card-label">1½ litres</div>
+          <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 600 }}>
+            ₹{(1.5 * currentRate).toFixed(0)}
+          </div>
         </div>
 
-        {/* 2.0 Litres */}
+        {/* 2.0 Litres (2 L) */}
         <div
           className="quantity-card"
           onClick={() => handleQuantitySelect(2.0)}
@@ -406,32 +549,34 @@ export default function TodayPage() {
           tabIndex={0}
           id="card-qty-2-0"
         >
-          <div className="quantity-card-bottle-icon">
-            <MilkBottleIcon size={26} />
+          <div className="figma-pill-badge">
+            <span className="pill-num">2</span>
+            <span className="pill-unit">L</span>
           </div>
-          <div className="quantity-number">{t.today.grid.twoLitre}</div>
-          <div className="quantity-price-preview">₹{(2.0 * currentRate).toFixed(0)}</div>
+          <div className="quantity-card-label">2 litres</div>
+          <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 600 }}>
+            ₹{(2.0 * currentRate).toFixed(0)}
+          </div>
         </div>
 
-        {/* 2+ Litres Custom Stepper Option */}
+        {/* 2+ Litres Custom Stepper Option (+) */}
         <div
           className="quantity-card"
           onClick={() => handleQuantitySelect(2.5)}
           role="button"
           tabIndex={0}
           id="card-qty-custom"
-          style={{ background: 'linear-gradient(180deg, #ffffff 0%, #eff6ff 100%)' }}
         >
-          <div className="quantity-card-bottle-icon" style={{ background: '#dbeafe', color: '#1d4ed8' }}>
-            <Sliders size={24} />
+          <div className="figma-pill-badge">
+            <span className="pill-num">+</span>
           </div>
-          <div className="quantity-number" style={{ fontSize: '1.2rem' }}>
-            {t.today.grid.customLitre}
+          <div className="quantity-card-label">2+ litres</div>
+          <div style={{ fontSize: '0.76rem', color: '#6b7280', fontWeight: 600 }}>
+            Custom
           </div>
-          <div className="quantity-price-preview">Adjust Quantity</div>
         </div>
 
-        {/* Absent Option */}
+        {/* Absent Option (Crossed Bottle) */}
         <div
           className="quantity-card absent-card"
           onClick={handleOpenAbsent}
@@ -439,45 +584,401 @@ export default function TodayPage() {
           tabIndex={0}
           id="card-qty-absent"
         >
-          <div className="quantity-card-bottle-icon">
-            <Ban size={24} />
+          <div className="figma-pill-badge absent">
+            <Ban size={26} />
           </div>
-          <div className="quantity-number">{t.today.grid.absent}</div>
-          <div className="quantity-price-preview" style={{ color: '#ea580c' }}>
+          <div className="quantity-card-label" style={{ color: '#78716c' }}>
+            Absent
+          </div>
+          <div style={{ fontSize: '0.76rem', color: '#ea580c', fontWeight: 600 }}>
             0 Litres
           </div>
         </div>
       </section>
 
-      {/* Today's Logged Record Status (if any) */}
-      {todayEntries.length > 0 && (
-        <section className="content-card" style={{ marginTop: '2rem' }}>
-          <div className="card-title-group" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Recorded Today</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Joint delivery records awaiting or confirmed by vendor
-              </p>
+      {/* =========================================================================
+          FIGMA IN-BETWEEN FUNCTION CARDS: Products & Vendors & Send Purchase
+          ========================================================================= */}
+      <section className="figma-feature-container" aria-label="Products, Vendors and Send Purchase Functions">
+        {/* 1. Products & Vendors Function Card */}
+        <div className="figma-feature-card" id="card-feature-products-vendors">
+          <div
+            className="figma-feature-header"
+            onClick={() => setIsProductsVendorsOpen(!isProductsVendorsOpen)}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="figma-feature-left">
+              <div className="figma-feature-icon-circle">
+                <MilkBottleIcon size={22} fillColor="#1b4332" />
+              </div>
+              <div className="figma-feature-text">
+                <h3>Products & vendors</h3>
+                <p>Review items and vendor details</p>
+              </div>
             </div>
-            <Link href="/history" className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
-              <Eye size={14} /> View All
-            </Link>
+            <div className={`figma-feature-chevron ${isProductsVendorsOpen ? 'open' : ''}`}>
+              <ChevronDown size={20} />
+            </div>
           </div>
 
+          {isProductsVendorsOpen && (
+            <div className="figma-feature-body">
+              {/* Active Vendor Details */}
+              <div
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e5e2d9',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#6b7280', fontWeight: 700 }}>
+                      Primary Dairy Vendor
+                    </span>
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#183d2d' }}>
+                      {dairyVendor?.name}
+                    </h4>
+                    <p style={{ fontSize: '0.82rem', color: '#4b5563', marginTop: '0.15rem' }}>
+                      WhatsApp: <strong>{dairyVendor?.phone_number}</strong>
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyVendorToken}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.7rem' }}
+                    id="btn-quick-copy-vendor-link"
+                  >
+                    {copiedToken ? (
+                      <>
+                        <Check size={14} color="#059669" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} />
+                        <span>Copy Vendor Link</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Items & Rates Preview */}
+              <h4 style={{ fontSize: '0.86rem', fontWeight: 800, marginBottom: '0.6rem', color: '#374151' }}>
+                Items Catalog & Current Rates:
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem', marginBottom: '1rem' }}>
+                {products.map((p) => (
+                  <div
+                    key={p.id}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e5e2d9',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '0.65rem 0.85rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700 }}>{p.name}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>Unit: {p.unit_type}</div>
+                    </div>
+                    <div style={{ fontWeight: 800, color: '#1b4332', fontSize: '0.95rem' }}>
+                      ₹{p.default_price}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <Link
+                  href="/products-vendors"
+                  className="btn-primary"
+                  style={{ width: 'auto', fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                >
+                  <ExternalLink size={14} />
+                  <span>Full Products & Vendors Management</span>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Send Purchase Function Card */}
+        <div className="figma-feature-card" id="card-feature-send-purchase">
+          <div
+            className="figma-feature-header"
+            onClick={() => setIsSendPurchaseOpen(!isSendPurchaseOpen)}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="figma-feature-left">
+              <div className="figma-feature-icon-circle">
+                <IndianRupee size={20} color="#1b4332" />
+              </div>
+              <div className="figma-feature-text">
+                <h3>Send purchase</h3>
+                <p>Share a one-time purchase with WhatsApp</p>
+              </div>
+            </div>
+            <div className={`figma-feature-chevron ${isSendPurchaseOpen ? 'open' : ''}`}>
+              <ChevronDown size={20} />
+            </div>
+          </div>
+
+          {isSendPurchaseOpen && (
+            <div className="figma-feature-body">
+              <form onSubmit={handleInlinePurchaseSubmit}>
+                <div className="form-group">
+                  <label className="form-label">Item / Product Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Desi Cow Ghee (500g), Fresh Butter, Curd Cup"
+                    value={inlinePurchaseName}
+                    onChange={(e) => setInlinePurchaseName(e.target.value)}
+                    className="form-input"
+                    required
+                    id="input-inline-purchase-name"
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Quantity</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={inlinePurchaseQty}
+                      onChange={(e) => setInlinePurchaseQty(parseFloat(e.target.value) || 1)}
+                      className="form-input"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Total Price (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={inlinePurchasePrice}
+                      onChange={(e) => setInlinePurchasePrice(parseFloat(e.target.value) || 0)}
+                      className="form-input"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Inline Camera / Photo input */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={inlinePhotoInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleInlinePhotoCapture}
+                  />
+
+                  {!inlinePurchasePhoto ? (
+                    <button
+                      type="button"
+                      className="camera-trigger-btn"
+                      onClick={() => inlinePhotoInputRef.current?.click()}
+                      style={{ padding: '0.5rem', fontSize: '0.82rem' }}
+                    >
+                      <Camera size={16} />
+                      <span>Attach Photo Proof (Optional)</span>
+                    </button>
+                  ) : (
+                    <div className="photo-preview-wrapper" style={{ height: '110px' }}>
+                      <img src={inlinePurchasePhoto} alt="Purchase Preview" />
+                      <button
+                        type="button"
+                        className="photo-remove-btn"
+                        onClick={() => setInlinePurchasePhoto(null)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setIsSendPurchaseOpen(false)}
+                    style={{ width: 'auto', fontSize: '0.82rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingInlinePurchase}
+                    className="btn-primary"
+                    style={{ width: 'auto', fontSize: '0.85rem', padding: '0.55rem 1.15rem' }}
+                    id="btn-submit-inline-purchase"
+                  >
+                    <Send size={15} />
+                    <span>{isSubmittingInlinePurchase ? 'Dispatching...' : 'Record & Send WhatsApp'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* =========================================================================
+          DELIVERIES SECTION WITH MONTH OR YEAR FILTER (USER REQUIREMENT)
+          ========================================================================= */}
+      <section className="content-card" style={{ marginTop: '1rem' }}>
+        <div className="filter-toolbar">
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#111827' }}>
+              Recorded Deliveries
+            </h3>
+            <p style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+              {deliveryFilter === 'today'
+                ? "Showing today's entries"
+                : deliveryFilter === 'month'
+                ? `Filtered by month: ${filterMonth}`
+                : deliveryFilter === 'year'
+                ? `Filtered by year: ${filterYear}`
+                : 'Showing all recorded entries'}
+            </p>
+          </div>
+
+          {/* Filter Selector Tabs */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div className="filter-pill-group" role="tablist">
+              <button
+                type="button"
+                className={`filter-pill-btn ${deliveryFilter === 'today' ? 'active' : ''}`}
+                onClick={() => setDeliveryFilter('today')}
+                id="btn-filter-today"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${deliveryFilter === 'month' ? 'active' : ''}`}
+                onClick={() => setDeliveryFilter('month')}
+                id="btn-filter-month"
+              >
+                Month
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${deliveryFilter === 'year' ? 'active' : ''}`}
+                onClick={() => setDeliveryFilter('year')}
+                id="btn-filter-year"
+              >
+                Year
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${deliveryFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setDeliveryFilter('all')}
+                id="btn-filter-all"
+              >
+                All
+              </button>
+            </div>
+
+            {/* If Month Filter chosen: show Month selector */}
+            {deliveryFilter === 'month' && (
+              <input
+                type="month"
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="form-input"
+                style={{ width: 'auto', padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 700 }}
+                id="select-delivery-month"
+              />
+            )}
+
+            {/* If Year Filter chosen: show Year selector */}
+            {deliveryFilter === 'year' && (
+              <select
+                value={filterYear}
+                onChange={(e) => setFilterYear(e.target.value)}
+                className="form-select"
+                style={{ width: 'auto', padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 700 }}
+                id="select-delivery-year"
+              >
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+              </select>
+            )}
+
+            <Link href="/history" className="btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.7rem' }}>
+              <Eye size={13} /> Full Ledger
+            </Link>
+          </div>
+        </div>
+
+        {/* Filter Period Summary Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.65rem 1rem',
+            marginBottom: '1rem',
+            fontSize: '0.82rem',
+          }}
+        >
+          <div>
+            Total Milk: <strong>{filteredLitres.toFixed(1)} L</strong>
+          </div>
+          <div>
+            Total Expenditure: <strong style={{ color: '#1b4332' }}>₹{filteredAmount.toFixed(0)}</strong>
+          </div>
+          <div>
+            Records: <strong>{filteredEntries.length}</strong>
+          </div>
+        </div>
+
+        {/* Ledger List */}
+        {filteredEntries.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem 1rem', color: '#9ca3af', fontSize: '0.85rem' }}>
+            No delivery records found for this selected filter period.
+          </div>
+        ) : (
           <div className="ledger-list">
-            {todayEntries.map((entry) => (
+            {filteredEntries.map((entry) => (
               <div key={entry.id} className="ledger-row-card">
                 <div className="ledger-row-top">
                   <span className="ledger-date">
                     <Clock size={14} color="#64748b" />
-                    Today at {entry.entry_time}
+                    {entry.entry_date} at {entry.entry_time}
                   </span>
                   <StatusBadge status={entry.status} statusSetBy={entry.status_set_by} />
                 </div>
                 <div className="ledger-details">
                   <span className="ledger-items">
-                    🥛 {entry.quantity}L ({selectedSubtype} milk)
-                    {entry.extra_items?.length > 0 && ` + ${entry.extra_items.length} items`}
+                    {entry.status === 'absent' ? (
+                      <span style={{ color: '#ea580c', fontWeight: 700 }}>Absent (0 Litres)</span>
+                    ) : (
+                      <>
+                        🥛 {entry.quantity}L ({selectedSubtype} milk)
+                        {entry.extra_items?.length > 0 && ` + ${entry.extra_items.length} items`}
+                      </>
+                    )}
                   </span>
                   <span className="ledger-amount">₹{entry.total_price}</span>
                 </div>
@@ -489,8 +990,8 @@ export default function TodayPage() {
               </div>
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* QUICK ENTRY MODAL POP-UP */}
       {isModalOpen && (
