@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { useMitra } from '@/context/MitraContext';
 import { compressImage } from '@/lib/imageCompression';
+import { CleanNumberInput } from '@/components/CleanNumberInput';
 import {
   ShoppingBag,
   Send,
@@ -154,27 +155,27 @@ export default function SendPurchasePage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
               <div className="form-group">
                 <label className="form-label">{t.sendPurchase.quantity}</label>
-                <input
-                  type="number"
-                  min="1"
+                <CleanNumberInput
+                  min={1}
                   step="0.5"
                   value={quantity}
-                  onChange={(e) => setQuantity(parseFloat(e.target.value) || 1)}
+                  onChange={(val) => setQuantity(val || 1)}
                   className="form-input"
                   required
+                  id="input-purchase-quantity"
                 />
               </div>
 
               <div className="form-group">
                 <label className="form-label">{t.sendPurchase.price}</label>
-                <input
-                  type="number"
-                  min="0"
+                <CleanNumberInput
+                  min={0}
                   step="1"
                   value={totalPrice}
-                  onChange={(e) => setTotalPrice(parseFloat(e.target.value) || 0)}
+                  onChange={(val) => setTotalPrice(val || 0)}
                   className="form-input"
                   required
+                  id="input-purchase-price"
                 />
               </div>
             </div>

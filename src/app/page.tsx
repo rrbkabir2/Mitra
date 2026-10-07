@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { compressImage } from '@/lib/imageCompression';
 import { sendWhatsAppDeliveryMessage, sendWhatsAppAbsentAlert } from '@/lib/whatsapp';
 import { MilkSubtype, ExtraItem, UnitType } from '@/types';
+import { CleanNumberInput } from '@/components/CleanNumberInput';
 import {
   Camera,
   X,
@@ -863,27 +864,27 @@ export default function TodayPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                   <div className="form-group">
                     <label className="form-label">Quantity</label>
-                    <input
-                      type="number"
-                      min="1"
+                    <CleanNumberInput
+                      min={1}
                       step="0.5"
                       value={inlinePurchaseQty}
-                      onChange={(e) => setInlinePurchaseQty(parseFloat(e.target.value) || 1)}
+                      onChange={(val) => setInlinePurchaseQty(val || 1)}
                       className="form-input"
                       required
+                      id="input-inline-purchase-qty"
                     />
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">Total Price (₹)</label>
-                    <input
-                      type="number"
-                      min="0"
+                    <CleanNumberInput
+                      min={0}
                       step="1"
                       value={inlinePurchasePrice}
-                      onChange={(e) => setInlinePurchasePrice(parseFloat(e.target.value) || 0)}
+                      onChange={(val) => setInlinePurchasePrice(val || 0)}
                       className="form-input"
                       required
+                      id="input-inline-purchase-price"
                     />
                   </div>
                 </div>
@@ -1139,13 +1140,12 @@ export default function TodayPage() {
                   >
                     -
                   </button>
-                  <input
-                    type="number"
+                  <CleanNumberInput
                     step="0.25"
-                    min="0.25"
-                    max="50"
+                    min={0.25}
+                    max={50}
                     value={entryQuantity}
-                    onChange={(e) => setEntryQuantity(parseFloat(e.target.value) || 0)}
+                    onChange={(val) => setEntryQuantity(val || 0.25)}
                     className="form-input stepper-input"
                     id="input-entry-quantity"
                     required
@@ -1329,13 +1329,13 @@ export default function TodayPage() {
                       >
                         -
                       </button>
-                      <input
-                        type="number"
+                      <CleanNumberInput
                         step={extraItemUnit === 'kilogram' ? '0.25' : '1'}
-                        min={extraItemUnit === 'kilogram' ? '0.25' : '1'}
+                        min={extraItemUnit === 'kilogram' ? 0.25 : 1}
                         value={extraItemQty}
-                        onChange={(e) => setExtraItemQty(parseFloat(e.target.value) || 1)}
+                        onChange={(val) => setExtraItemQty(val || 1)}
                         style={{ width: '100%', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 800, fontSize: '0.95rem', outline: 'none' }}
+                        id="input-extra-qty"
                       />
                       <button
                         type="button"
@@ -1375,11 +1375,10 @@ export default function TodayPage() {
                       <span style={{ position: 'absolute', left: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)', fontSize: '0.95rem', pointerEvents: 'none' }}>
                         ₹
                       </span>
-                      <input
-                        type="number"
-                        min="0"
+                      <CleanNumberInput
+                        min={0}
                         value={extraItemPrice}
-                        onChange={(e) => setExtraItemPrice(parseFloat(e.target.value) || 0)}
+                        onChange={(val) => setExtraItemPrice(val || 0)}
                         className="form-input"
                         style={{ paddingLeft: '1.6rem', paddingRight: '0.5rem', fontSize: '0.95rem', fontWeight: 700, height: 42 }}
                         id="input-extra-price"

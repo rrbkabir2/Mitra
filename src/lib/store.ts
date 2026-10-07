@@ -3,6 +3,8 @@ import {
   Vendor,
   Product,
   Entry,
+  EntryStatus,
+  StatusSetBy,
   PriceChangeRequest,
   WhatsAppUsage,
   PurchaseRecord,
@@ -13,7 +15,7 @@ import {
 const DEFAULT_HOUSEHOLD: Household = {
   id: 'hh-01',
   admin_id: 'admin-01',
-  name: 'Sharma Household',
+  name: 'Kabir Bundele',
   language: 'en',
   advanced_mode: false,
   auto_confirm_hours: 24,
@@ -31,6 +33,7 @@ const DEFAULT_VENDORS: Vendor[] = [
     access_token: 'ramesh_dairy_token_7f9c84e1a0b3d64821aef59012cd',
     token_created_at: new Date().toISOString(),
     is_active: true,
+    auto_monthly_report: true,
     created_at: new Date().toISOString(),
   },
   {
@@ -42,6 +45,7 @@ const DEFAULT_VENDORS: Vendor[] = [
     access_token: 'kisan_grocery_token_5e82a1b94d7620ef3c9147ba01da',
     token_created_at: new Date().toISOString(),
     is_active: true,
+    auto_monthly_report: true,
     created_at: new Date().toISOString(),
   },
 ];
@@ -165,7 +169,7 @@ const DEFAULT_ENTRIES: Entry[] = [
     extra_items: [],
     entry_date: getPastDate(4),
     entry_time: '07:10',
-    status: 'confirmed',
+    status: 'auto-confirmed',
     status_set_by: 'system_auto',
     status_set_at: new Date(Date.now() - 345600000 + 86400000).toISOString(),
     whatsapp_message_id: 'wamid_sample_04',
@@ -257,16 +261,47 @@ class MitraStore {
     if (!this.isClient) return;
     try {
       const h = localStorage.getItem('mitra_household');
-      if (h) this.household = JSON.parse(h);
+      if (h) {
+        this.household = JSON.parse(h);
+        // Automatic migration: update old placeholder names to Kabir Bundele
+        if (this.household.name === 'Sharma Household' || this.household.name === "Meera's home") {
+          this.household.name = 'Kabir Bundele';
+          this.saveToStorage();
+        }
+      }
 
       const v = localStorage.getItem('mitra_vendors');
-      if (v) this.vendors = JSON.parse(v);
+      if (v) {
+        this.vendors = JSON.parse(v);
+        // Ensure auto_monthly_report is set on all vendors
+        let updated = false;
+        this.vendors = this.vendors.map((vendor) => {
+          if (vendor.auto_monthly_report === undefined) {
+            updated = true;
+            return { ...vendor, auto_monthly_report: true };
+          }
+          return vendor;
+        });
+        if (updated) this.saveToStorage();
+      }
 
       const p = localStorage.getItem('mitra_products');
       if (p) this.products = JSON.parse(p);
 
       const e = localStorage.getItem('mitra_entries');
-      if (e) this.entries = JSON.parse(e);
+      if (e) {
+        this.entries = JSON.parse(e);
+        // Migration: entries previously set by system_auto with 'confirmed' are now correctly 'auto-confirmed'
+        let updatedEntries = false;
+        this.entries = this.entries.map((entry) => {
+          if (entry.status_set_by === 'system_auto' && entry.status === 'confirmed') {
+            updatedEntries = true;
+            return { ...entry, status: 'auto-confirmed' as EntryStatus };
+          }
+          return entry;
+        });
+        if (updatedEntries) this.saveToStorage();
+      }
 
       const pr = localStorage.getItem('mitra_price_requests');
       if (pr) this.priceRequests = JSON.parse(pr);
@@ -337,6 +372,36 @@ class MitraStore {
   }
 
   // Setters & Mutations
+  public setVendors(vendors: Vendor[]): void {
+    this.vendors = [...vendors];
+    this.notify();
+  }
+
+  public setProducts(products: Product[]): void {
+    this.products = [...products];
+    this.notify();
+  }
+
+  public setEntries(entries: Entry[]): void {
+    this.entries = [...entries];
+    this.notify();
+  }
+
+  public setPriceRequests(requests: PriceChangeRequest[]): void {
+    this.priceRequests = [...requests];
+    this.notify();
+  }
+
+  public setPurchases(purchases: PurchaseRecord[]): void {
+    this.purchases = [...purchases];
+    this.notify();
+  }
+
+  public setWhatsAppUsageCount(count: number): void {
+    this.monthlyMessageCount = count;
+    this.notify();
+  }
+
   public updateHousehold(updates: Partial<Household>) {
     this.household = { ...this.household, ...updates };
     this.notify();
@@ -370,7 +435,7 @@ class MitraStore {
    */
   public updateEntryStatus(
     entryId: string,
-    newStatus: 'confirmed' | 'denied',
+    newStatus: 'confirmed' | 'auto-confirmed' | 'denied',
     setBy: 'vendor' | 'system_auto'
   ): boolean {
     if (!setBy || (setBy !== 'vendor' && setBy !== 'system_auto')) {
@@ -380,15 +445,78 @@ class MitraStore {
     const index = this.entries.findIndex((e) => e.id === entryId);
     if (index === -1) return false;
 
+    // Point 8: Store auto-confirmed as distinct status when set by system_auto
+    const finalStatus: EntryStatus = setBy === 'system_auto' ? 'auto-confirmed' : newStatus;
+
     this.entries[index] = {
       ...this.entries[index],
-      status: newStatus,
+      status: finalStatus,
       status_set_by: setBy,
       status_set_at: new Date().toISOString(),
+      delivered_confirmed_at:
+        finalStatus === 'confirmed' || finalStatus === 'auto-confirmed'
+          ? new Date().toISOString()
+          : this.entries[index].delivered_confirmed_at,
     };
 
+    this.saveToStorage();
     this.notify();
     return true;
+  }
+
+  /**
+   * Point 8: Auto-confirm entries older than window (default 24h) with distinct status
+   */
+  public autoConfirmPendingEntries(hours = 24): number {
+    const cutoffTime = Date.now() - hours * 3600 * 1000;
+    let autoConfirmedCount = 0;
+
+    this.entries = this.entries.map((entry) => {
+      if (entry.status === 'pending') {
+        const entryTimestamp = new Date(entry.created_at).getTime();
+        if (entryTimestamp <= cutoffTime) {
+          autoConfirmedCount++;
+          return {
+            ...entry,
+            status: 'auto-confirmed' as EntryStatus,
+            status_set_by: 'system_auto' as StatusSetBy,
+            status_set_at: new Date().toISOString(),
+            delivered_confirmed_at: new Date().toISOString(),
+            notes: (entry.notes ? entry.notes + ' | ' : '') + 'Auto-confirmed after 24h with no vendor dispute',
+          };
+        }
+      }
+      return entry;
+    });
+
+    if (autoConfirmedCount > 0) {
+      this.saveToStorage();
+      this.notify();
+    }
+    return autoConfirmedCount;
+  }
+
+  /**
+   * Point 7: Vendor-specific auto-send monthly report toggle
+   */
+  public toggleVendorAutoMonthlyReport(vendorId: string, enabled: boolean): boolean {
+    const index = this.vendors.findIndex((v) => v.id === vendorId);
+    if (index === -1) return false;
+
+    this.vendors[index] = {
+      ...this.vendors[index],
+      auto_monthly_report: enabled,
+    };
+
+    this.saveToStorage();
+    this.notify();
+    return true;
+  }
+
+  public setAllVendorsAutoMonthlyReport(enabled: boolean): void {
+    this.vendors = this.vendors.map((v) => ({ ...v, auto_monthly_report: enabled }));
+    this.saveToStorage();
+    this.notify();
   }
 
   public rotateVendorToken(vendorId: string): string {

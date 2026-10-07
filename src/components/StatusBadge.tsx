@@ -13,18 +13,19 @@ interface StatusBadgeProps {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, statusSetBy }) => {
   const { t } = useMitra();
 
+  if (status === 'auto-confirmed' || (status === 'confirmed' && statusSetBy === 'system_auto')) {
+    return (
+      <span
+        className="badge-status auto"
+        title="Auto-confirmed after 24h with no vendor dispute. Admins cannot alter this."
+      >
+        <Clock size={12} />
+        {t.history.status.autoConfirmed}
+      </span>
+    );
+  }
+
   if (status === 'confirmed') {
-    if (statusSetBy === 'system_auto') {
-      return (
-        <span
-          className="badge-status auto"
-          title="Auto-confirmed after 24h with no vendor dispute. Admins cannot alter this."
-        >
-          <Clock size={12} />
-          {t.history.status.autoConfirmed}
-        </span>
-      );
-    }
     return (
       <span
         className="badge-status confirmed"

@@ -6,7 +6,7 @@ export type UnitType = 'litre' | 'kilogram' | 'count';
 
 export type MilkSubtype = 'cow' | 'buffalo';
 
-export type EntryStatus = 'pending' | 'confirmed' | 'denied' | 'absent';
+export type EntryStatus = 'pending' | 'confirmed' | 'auto-confirmed' | 'denied' | 'absent';
 
 export type StatusSetBy = 'vendor' | 'system_auto';
 
@@ -38,6 +38,7 @@ export interface Vendor {
   access_token: string;
   token_created_at: string;
   is_active: boolean;
+  auto_monthly_report?: boolean; // Vendor-specific monthly WhatsApp report toggle
   created_at: string;
 }
 

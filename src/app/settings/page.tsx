@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMitra } from '@/context/MitraContext';
+import { CleanNumberInput } from '@/components/CleanNumberInput';
+import { MilkBottleIcon } from '@/components/MilkBottleIcon';
 import { Language } from '@/types';
 import {
   Settings,
@@ -14,7 +16,18 @@ import {
   ShieldCheck,
   ToggleLeft,
   ToggleRight,
+  Download,
+  Smartphone,
+  Check,
+  Zap,
+  Info,
+  Layers,
 } from 'lucide-react';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 export default function SettingsPage() {
   const {
@@ -29,6 +42,51 @@ export default function SettingsPage() {
   const [reminderTime, setReminderTime] = useState<string>(household.daily_reminder_time || '09:00');
   const [autoConfirmHours, setAutoConfirmHours] = useState<number>(household.auto_confirm_hours || 24);
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
+
+  // Point 5: PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState<boolean>(false);
+  const [installSuccess, setInstallSuccess] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setInstallSuccess(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallSuccess(true);
+      }
+      setDeferredPrompt(null);
+    } else {
+      alert(
+        'To install Mitra on Android:\n\n1. Open Chrome on your Android phone.\n2. Tap the three dots (⋮) in the top-right corner.\n3. Tap "Add to Home screen" or "Install app".\n\nMitra will be installed directly on your home screen!'
+      );
+    }
+  };
 
   const handlePruneStorage = () => {
     if (confirm('Delete photos older than 30 days? Immutable ledger records (quantity, date, price, status) will be permanently preserved.')) {
@@ -75,6 +133,157 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* =========================================================================
+            POINT 5: DOWNLOADABLE APP SECTION (ANDROID TARGETED, EXTENSIBLE ARCHITECTURE)
+            ========================================================================= */}
+        <section className="content-card" id="section-download-app" style={{ border: '1.5px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <div style={{ background: '#183d2d', color: '#ffffff', padding: '0.45rem', borderRadius: '10px', display: 'flex' }}>
+                <Smartphone size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.12rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Download & Install Mitra App
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.15rem' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#183d2d' }}>Mitra</span>
+                  <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 700 }}>
+                    Version 0.1
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: '#ecfdf5', color: '#059669', fontSize: '0.74rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '9999px', border: '1px solid #a7f3d0' }}>
+              <ShieldCheck size={14} />
+              <span>Zero Background Processes</span>
+            </div>
+          </div>
+
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.5 }}>
+            Install Mitra directly to your Android device from this website. Enjoy instant access, offline caching, and a responsive native experience.
+          </p>
+
+          {/* Platform Cards Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem', marginBottom: '1rem' }}>
+            {/* 1. Android Option (Active & Targeted) */}
+            <div
+              style={{
+                border: '1.5px solid #183d2d',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem',
+                background: '#f8fafc',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, fontSize: '0.9rem', color: '#183d2d' }}>
+                    <Smartphone size={16} />
+                    <span>Android (Primary)</span>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', background: '#dcfce7', color: '#15803d', fontWeight: 700, padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                    Supported
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.77rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                  Packaged web application with standalone window support on Android smartphones.
+                </p>
+              </div>
+
+              <div style={{ marginTop: '0.85rem' }}>
+                <button
+                  type="button"
+                  onClick={handleInstallClick}
+                  className="btn-primary"
+                  style={{
+                    width: '100%',
+                    background: '#183d2d',
+                    borderColor: '#183d2d',
+                    fontSize: '0.82rem',
+                    padding: '0.45rem 0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                  }}
+                  id="btn-install-android"
+                >
+                  <Download size={14} />
+                  <span>{isInstalled ? 'App Already Installed' : 'Install on Android'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 2. iOS / Safari (Structured for Future Expansion) */}
+            <div
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem',
+                background: '#ffffff',
+                opacity: 0.85,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                  <span>iOS / iPadOS</span>
+                </div>
+                <span style={{ fontSize: '0.7rem', background: '#f1f5f9', color: '#64748b', fontWeight: 600, padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                  Web App
+                </span>
+              </div>
+              <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                Available via Safari: Tap Share (<span style={{ fontWeight: 700 }}>⎙</span>) then select <em>Add to Home Screen</em>.
+              </p>
+            </div>
+
+            {/* 3. Windows & Desktop (Structured for Future Expansion) */}
+            <div
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 'var(--radius-md)',
+                padding: '1rem',
+                background: '#ffffff',
+                opacity: 0.85,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                  <span>Windows & Linux</span>
+                </div>
+                <span style={{ fontSize: '0.7rem', background: '#f1f5f9', color: '#64748b', fontWeight: 600, padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                  Desktop Web
+                </span>
+              </div>
+              <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                Installable from Chrome or Edge desktop address bar.
+              </p>
+            </div>
+          </div>
+
+          {/* Critical Resource & Background Guarantee Banner */}
+          <div
+            style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.75rem 0.85rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.6rem',
+            }}
+          >
+            <ShieldCheck size={18} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '0.76rem', color: '#166534', lineHeight: 1.45 }}>
+              <strong>Strict Zero Background Execution Policy:</strong> The installed Mitra app runs exclusively while actively open on your screen. It starts no background sync, no hidden workers, and completely stops running and releases 100% of device resources the instant it is closed.
+            </div>
+          </div>
+        </section>
+
         {/* 1. LANGUAGE SWITCHER (FULL UI TRANSLATION) */}
         <section className="content-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
@@ -137,7 +346,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* 3. AUTO-CONFIRM WINDOW */}
+        {/* 3. AUTO-CONFIRM WINDOW (POINT 9: CLEAN NUMBER INPUT) */}
         <section className="content-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
             <Clock size={20} color="var(--primary)" />
@@ -148,14 +357,14 @@ export default function SettingsPage() {
           </p>
 
           <div style={{ maxWidth: '240px' }}>
-            <input
-              type="number"
-              min="1"
-              max="72"
+            <CleanNumberInput
+              min={1}
+              max={72}
               value={autoConfirmHours}
-              onChange={(e) => setAutoConfirmHours(parseInt(e.target.value, 10) || 24)}
+              onChange={(val) => setAutoConfirmHours(val || 24)}
               className="form-input"
               id="input-auto-confirm-hours"
+              aria-label="Auto Confirm Window in Hours"
             />
           </div>
         </section>

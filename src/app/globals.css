@@ -93,6 +93,22 @@ button {
 }
 
 /* ==========================================================================
+   POINT 9: GLOBAL NUMBER INPUT FIXES
+   - Remove spin buttons in WebKit, Firefox, Safari and Edge
+   - Ensure clean number styling without intrusive arrows
+   ========================================================================== */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+
+/* ==========================================================================
    LAYOUT STRUCTURE
    ========================================================================== */
 .mitra-app {

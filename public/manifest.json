@@ -1,0 +1,18 @@
+{
+  "name": "Mitra",
+  "short_name": "Mitra",
+  "description": "Permanent Delivery Confirmation Trust Layer for Kabir Bundele",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#183d2d",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

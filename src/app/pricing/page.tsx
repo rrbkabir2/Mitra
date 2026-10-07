@@ -5,6 +5,7 @@ import { useMitra } from '@/context/MitraContext';
 import { TrustSafeguardBanner } from '@/components/TrustSafeguardBanner';
 import { sendWhatsAppPriceRequest } from '@/lib/whatsapp';
 import { Product } from '@/types';
+import { CleanNumberInput } from '@/components/CleanNumberInput';
 import {
   Tag,
   AlertTriangle,
@@ -280,13 +281,12 @@ export default function PricingPage() {
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                 <label className="form-label">{t.pricing.newPriceLabel}</label>
                 <div style={{ position: 'relative' }}>
-                  <input
-                    type="number"
+                  <CleanNumberInput
                     step="0.5"
-                    min="1"
-                    max="500"
+                    min={1}
+                    max={500}
                     value={newProposedPrice}
-                    onChange={(e) => setNewProposedPrice(parseFloat(e.target.value) || 0)}
+                    onChange={(val) => setNewProposedPrice(val || 65)}
                     className="form-input"
                     required
                     style={{ fontSize: '1.25rem', fontWeight: 800, paddingLeft: '2.5rem' }}

@@ -62,11 +62,11 @@ export const Header: React.FC = () => {
             <MilkBottleIcon size={24} fillColor="#ffffff" />
           </div>
           <div className="brand-title-group">
-            <h1 style={{ fontSize: '0.98rem', lineHeight: '1.2', fontWeight: 800, color: '#183d2d', background: 'none', WebkitTextFillColor: 'initial' }}>
-              Milk Delivery<br />Confirmation Tracker
+            <h1 style={{ fontSize: '1.25rem', lineHeight: '1.15', fontWeight: 800, color: '#183d2d', letterSpacing: '-0.02em', background: 'none', WebkitTextFillColor: 'initial' }}>
+              Mitra
             </h1>
             <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
-              {household.name || "Meera's home"}
+              {household.name || 'Kabir Bundele'}
             </span>
           </div>
         </Link>

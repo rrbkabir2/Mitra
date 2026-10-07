@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useMitra } from '@/context/MitraContext';
 import { VendorType, UnitType, MilkSubtype } from '@/types';
+import { CleanNumberInput } from '@/components/CleanNumberInput';
 import {
   Users,
   Package,
@@ -403,14 +404,14 @@ export default function ProductsVendorsPage() {
 
                 <div className="form-group">
                   <label className="form-label">{t.vendors.defaultPrice}</label>
-                  <input
-                    type="number"
+                  <CleanNumberInput
                     step="0.5"
-                    min="1"
+                    min={1}
                     value={productPrice}
-                    onChange={(e) => setProductPrice(parseFloat(e.target.value) || 0)}
+                    onChange={(val) => setProductPrice(val || 60)}
                     className="form-input"
                     required
+                    id="input-product-price"
                   />
                 </div>
               </div>

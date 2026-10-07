@@ -1,20 +1,17 @@
 -- ==============================================================================
--- MITRA DELIVERY CONFIRMATION PLATFORM - DATABASE SCHEMA & TRUST SAFEGUARDS
--- Core Principle: Tamper-proof, jointly confirmed daily records between household & vendors.
--- WhatsApp is primary vendor channel; vendor never logs in. Admin uses full web app.
+-- MITRA DELIVERY CONFIRMATION PLATFORM - FULL PRODUCTION SCHEMA & SEED
+-- ==============================================================================
+-- Run this in your Supabase SQL Editor to initialize all tables, RLS policies,
+-- tamper-proof triggers, vendor-token functions, and initial seed data for Kabir Bundele.
 -- ==============================================================================
 
--- 1. Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 2. Clean teardown for migrations if recreating
 DROP TRIGGER IF EXISTS trigger_enforce_tamper_proof_status ON entries;
 DROP FUNCTION IF EXISTS enforce_tamper_proof_status();
 
--- ------------------------------------------------------------------------------
--- Table: households
--- ------------------------------------------------------------------------------
+-- 1. Households
 CREATE TABLE IF NOT EXISTS households (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     admin_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -26,9 +23,7 @@ CREATE TABLE IF NOT EXISTS households (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ------------------------------------------------------------------------------
--- Table: vendors
--- ------------------------------------------------------------------------------
+-- 2. Vendors
 CREATE TABLE IF NOT EXISTS vendors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -45,9 +40,7 @@ CREATE TABLE IF NOT EXISTS vendors (
 CREATE INDEX IF NOT EXISTS idx_vendors_household_id ON vendors(household_id);
 CREATE INDEX IF NOT EXISTS idx_vendors_access_token ON vendors(access_token);
 
--- ------------------------------------------------------------------------------
--- Table: products
--- ------------------------------------------------------------------------------
+-- 3. Products
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -64,10 +57,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE INDEX IF NOT EXISTS idx_products_household_id ON products(household_id);
 CREATE INDEX IF NOT EXISTS idx_products_vendor_id ON products(vendor_id);
 
--- ------------------------------------------------------------------------------
--- Table: entries
--- Core daily delivery log
--- ------------------------------------------------------------------------------
+-- 4. Entries
 CREATE TABLE IF NOT EXISTS entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -94,10 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_entries_household_date ON entries(household_id, e
 CREATE INDEX IF NOT EXISTS idx_entries_vendor_date ON entries(vendor_id, entry_date DESC);
 CREATE INDEX IF NOT EXISTS idx_entries_status ON entries(status);
 
--- ------------------------------------------------------------------------------
--- Table: price_change_requests
--- Admin can request price change; only takes effect after vendor approval
--- ------------------------------------------------------------------------------
+-- 5. Price Change Requests
 CREATE TABLE IF NOT EXISTS price_change_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -113,15 +100,12 @@ CREATE TABLE IF NOT EXISTS price_change_requests (
 
 CREATE INDEX IF NOT EXISTS idx_price_change_vendor ON price_change_requests(vendor_id, status);
 
--- ------------------------------------------------------------------------------
--- Table: whatsapp_usage
--- Free tier tracking (1,000 free service messages/month) and prediction
--- ------------------------------------------------------------------------------
+-- 6. WhatsApp Usage
 CREATE TABLE IF NOT EXISTS whatsapp_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
     vendor_id UUID REFERENCES vendors(id) ON DELETE CASCADE,
-    month TEXT NOT NULL, -- Format: YYYY-MM
+    month TEXT NOT NULL,
     message_count INT NOT NULL DEFAULT 0 CHECK (message_count >= 0),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uq_household_vendor_month UNIQUE(household_id, vendor_id, month)
@@ -129,10 +113,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_usage (
 
 CREATE INDEX IF NOT EXISTS idx_whatsapp_usage_month ON whatsapp_usage(household_id, month);
 
--- ------------------------------------------------------------------------------
--- Table: purchase_records
--- One-time purchases for non-recurring items (e.g. ghee, butter, paneer, groceries)
--- ------------------------------------------------------------------------------
+-- 7. Purchase Records
 CREATE TABLE IF NOT EXISTS purchase_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -145,10 +126,7 @@ CREATE TABLE IF NOT EXISTS purchase_records (
     sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ------------------------------------------------------------------------------
--- Table: reminders_log
--- Track daily reminder nudge to ensure no silently missing day
--- ------------------------------------------------------------------------------
+-- 8. Reminders Log
 CREATE TABLE IF NOT EXISTS reminders_log (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -158,48 +136,36 @@ CREATE TABLE IF NOT EXISTS reminders_log (
     CONSTRAINT uq_household_reminder_date UNIQUE(household_id, date)
 );
 
--- ------------------------------------------------------------------------------
--- Table: audit_logs
--- Immutable tamper-proof ledger for security events
--- ------------------------------------------------------------------------------
+-- 9. Audit Logs
 CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID REFERENCES households(id) ON DELETE CASCADE,
     entity_type TEXT NOT NULL,
     entity_id UUID NOT NULL,
     action TEXT NOT NULL,
-    actor TEXT NOT NULL, -- 'admin', 'vendor', 'system_auto', 'webhook'
+    actor TEXT NOT NULL,
     details JSONB DEFAULT '{}'::jsonb,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ==============================================================================
--- TRUST SAFEGUARD TRIGGER: Database-level tamper-proofing
--- Admins cannot set entry status to 'confirmed', 'auto-confirmed', or 'denied'.
--- Approve and Deny belongs exclusively to vendor or system_auto.
--- ==============================================================================
+-- Trust Safeguard Trigger
 CREATE OR REPLACE FUNCTION enforce_tamper_proof_status()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- If caller is authenticated user (the household admin session)
     IF auth.role() = 'authenticated' THEN
-        -- Prevent admin from creating directly confirmed, auto-confirmed, or denied entries
         IF TG_OP = 'INSERT' AND NEW.status IN ('confirmed', 'auto-confirmed', 'denied') THEN
             RAISE EXCEPTION 'Trust Safeguard Violation: Entries cannot be created with confirmed, auto-confirmed, or denied status by household admin. Status is pending until vendor acts or auto-confirmation elapses.';
         END IF;
 
-        -- Prevent admin from updating status to confirmed, auto-confirmed, or denied
         IF TG_OP = 'UPDATE' AND (NEW.status <> OLD.status) AND NEW.status IN ('confirmed', 'auto-confirmed', 'denied') THEN
             RAISE EXCEPTION 'Trust Safeguard Violation: Admins cannot approve or deny delivery entries on vendor behalf. Confirmation is strictly reserved for the vendor via WhatsApp/Tokenized interface or system 24h auto-confirmation.';
         END IF;
 
-        -- Prevent admin from altering status_set_by
         IF TG_OP = 'UPDATE' AND (NEW.status_set_by IS DISTINCT FROM OLD.status_set_by) THEN
             RAISE EXCEPTION 'Trust Safeguard Violation: status_set_by cannot be modified by admin.';
         END IF;
     END IF;
 
-    -- Generic invariant: confirmed must have status_set_by = 'vendor'
     IF NEW.status = 'confirmed' THEN
         IF NEW.status_set_by IS NULL OR NEW.status_set_by <> 'vendor' THEN
             RAISE EXCEPTION 'Invalid status transition: confirmed status must be set by vendor.';
@@ -209,7 +175,6 @@ BEGIN
         END IF;
     END IF;
 
-    -- Generic invariant: auto-confirmed must have status_set_by = 'system_auto'
     IF NEW.status = 'auto-confirmed' THEN
         IF NEW.status_set_by IS NULL OR NEW.status_set_by <> 'system_auto' THEN
             RAISE EXCEPTION 'Invalid status transition: auto-confirmed status must be set by system_auto.';
@@ -219,7 +184,6 @@ BEGIN
         END IF;
     END IF;
 
-    -- Generic invariant: denied must have status_set_by set
     IF NEW.status = 'denied' THEN
         IF NEW.status_set_by IS NULL OR NEW.status_set_by NOT IN ('vendor', 'system_auto') THEN
             RAISE EXCEPTION 'Invalid status transition: denied status must be set by vendor.';
@@ -238,9 +202,7 @@ BEFORE INSERT OR UPDATE ON entries
 FOR EACH ROW
 EXECUTE FUNCTION enforce_tamper_proof_status();
 
--- ==============================================================================
--- ROW LEVEL SECURITY (RLS) POLICIES
--- ==============================================================================
+-- Row Level Security (RLS)
 ALTER TABLE households ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
@@ -251,7 +213,6 @@ ALTER TABLE purchase_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reminders_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Households: admin can view & update their own household
 CREATE POLICY "Admins can view their own household"
     ON households FOR SELECT
     USING (admin_id = auth.uid());
@@ -260,51 +221,39 @@ CREATE POLICY "Admins can update their own household"
     ON households FOR UPDATE
     USING (admin_id = auth.uid());
 
--- Vendors: admin can view and manage their vendors
 CREATE POLICY "Admins manage household vendors"
     ON vendors FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
--- Products: admin can view and manage products
 CREATE POLICY "Admins manage household products"
     ON products FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
--- Entries: admin can select, insert, update (governed by trigger)
 CREATE POLICY "Admins view and insert household entries"
     ON entries FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
--- Price change requests: admin can view and insert
 CREATE POLICY "Admins manage price requests"
     ON price_change_requests FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
--- WhatsApp usage: admin can view
 CREATE POLICY "Admins view whatsapp usage"
     ON whatsapp_usage FOR SELECT
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
--- Purchases: admin can view & insert
 CREATE POLICY "Admins manage purchase records"
     ON purchase_records FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
--- Reminders log: admin can view
 CREATE POLICY "Admins view reminders"
     ON reminders_log FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
--- Audit logs: admin can read their logs
 CREATE POLICY "Admins view audit logs"
     ON audit_logs FOR SELECT
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
--- ==============================================================================
--- VENDOR TOKEN SECURE INTERFACE (RLS & RPC)
--- Vendors access the platform via their unique, unguessable access_token.
--- They never log in with passwords. All vendor queries are scoped strictly to their own vendor_id.
--- ==============================================================================
+-- Vendor Token Functions
 CREATE OR REPLACE FUNCTION get_vendor_by_token(token_val TEXT)
 RETURNS TABLE (
     id UUID,
@@ -358,4 +307,3 @@ BEGIN
     RETURN FOUND;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-

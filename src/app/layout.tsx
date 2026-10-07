@@ -3,6 +3,7 @@ import './globals.css';
 import { MitraProvider } from '@/context/MitraContext';
 import { Header } from '@/components/Header';
 import { MobileNav } from '@/components/MobileNav';
+import { GlobalInputFixes } from '@/components/GlobalInputFixes';
 
 export const metadata: Metadata = {
   title: 'Mitra — Permanent Delivery Confirmation Trust Layer',
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Mitra Trust Platform' }],
   robots: 'noindex, nofollow', // Protected household platform
+  manifest: '/manifest.json',
 };
 
 export const viewport: Viewport = {
@@ -26,7 +28,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#2563eb',
+  themeColor: '#183d2d',
 };
 
 export default function RootLayout({
@@ -38,9 +40,11 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="icon" href="/favicon.ico" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
         <MitraProvider>
+          <GlobalInputFixes />
           <div className="mitra-app">
             <Header />
             {children}

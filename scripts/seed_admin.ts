@@ -12,9 +12,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 async function seedAdmin() {
-  const email = process.env.ADMIN_EMAIL || 'admin@household.internal';
+  const email = process.env.ADMIN_EMAIL || 'rrbkabir2@gmail.com';
   const password = process.env.ADMIN_PASSWORD || 'mitra2026';
-  const householdName = process.env.HOUSEHOLD_NAME || 'My Household';
+  const householdName = process.env.HOUSEHOLD_NAME || 'Kabir Bundele';
 
   console.log('========================================================');
   console.log('MITRA SECURE ADMIN PROVISIONING');
