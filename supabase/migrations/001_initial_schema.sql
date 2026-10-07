@@ -9,8 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- 2. Clean teardown for migrations if recreating
-DROP TRIGGER IF EXISTS trigger_enforce_tamper_proof_status ON entries;
-DROP FUNCTION IF EXISTS enforce_tamper_proof_status();
+DROP FUNCTION IF EXISTS enforce_tamper_proof_status() CASCADE;
 
 -- ------------------------------------------------------------------------------
 -- Table: households

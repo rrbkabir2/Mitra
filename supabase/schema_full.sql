@@ -8,8 +8,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-DROP TRIGGER IF EXISTS trigger_enforce_tamper_proof_status ON entries;
-DROP FUNCTION IF EXISTS enforce_tamper_proof_status();
+DROP FUNCTION IF EXISTS enforce_tamper_proof_status() CASCADE;
 
 -- 1. Households
 CREATE TABLE IF NOT EXISTS households (
@@ -197,6 +196,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS trigger_enforce_tamper_proof_status ON entries;
 CREATE TRIGGER trigger_enforce_tamper_proof_status
 BEFORE INSERT OR UPDATE ON entries
 FOR EACH ROW
@@ -213,42 +213,52 @@ ALTER TABLE purchase_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reminders_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can view their own household" ON households;
 CREATE POLICY "Admins can view their own household"
     ON households FOR SELECT
     USING (admin_id = auth.uid());
 
+DROP POLICY IF EXISTS "Admins can update their own household" ON households;
 CREATE POLICY "Admins can update their own household"
     ON households FOR UPDATE
     USING (admin_id = auth.uid());
 
+DROP POLICY IF EXISTS "Admins manage household vendors" ON vendors;
 CREATE POLICY "Admins manage household vendors"
     ON vendors FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Admins manage household products" ON products;
 CREATE POLICY "Admins manage household products"
     ON products FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Admins view and insert household entries" ON entries;
 CREATE POLICY "Admins view and insert household entries"
     ON entries FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Admins manage price requests" ON price_change_requests;
 CREATE POLICY "Admins manage price requests"
     ON price_change_requests FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Admins view whatsapp usage" ON whatsapp_usage;
 CREATE POLICY "Admins view whatsapp usage"
     ON whatsapp_usage FOR SELECT
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Admins manage purchase records" ON purchase_records;
 CREATE POLICY "Admins manage purchase records"
     ON purchase_records FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Admins view reminders" ON reminders_log;
 CREATE POLICY "Admins view reminders"
     ON reminders_log FOR ALL
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Admins view audit logs" ON audit_logs;
 CREATE POLICY "Admins view audit logs"
     ON audit_logs FOR SELECT
     USING (household_id IN (SELECT id FROM households WHERE admin_id = auth.uid()));
