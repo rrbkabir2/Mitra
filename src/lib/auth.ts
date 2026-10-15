@@ -7,11 +7,29 @@
  * 3. Any unauthorized email (including non-allowlisted Google accounts) is strictly rejected.
  */
 
-export const ADMIN_ALLOWLIST: string[] = [
+const envAllowed = (process.env.ALLOWED_ADMIN_EMAILS || process.env.NEXT_PUBLIC_ALLOWED_ADMIN_EMAILS || '')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+export const ADMIN_ALLOWLIST: string[] = Array.from(new Set([
   'rrbkabir2@gmail.com',
-  ...(process.env.NEXT_PUBLIC_ADMIN_EMAIL ? [process.env.NEXT_PUBLIC_ADMIN_EMAIL] : []),
-  ...(process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL] : []),
-].map((e) => e.trim().toLowerCase());
+  ...envAllowed,
+  ...(process.env.NEXT_PUBLIC_ADMIN_EMAIL ? [process.env.NEXT_PUBLIC_ADMIN_EMAIL.trim().toLowerCase()] : []),
+  ...(process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL.trim().toLowerCase()] : []),
+]));
+
+let dynamicAllowedEmails: string[] = [];
+
+export function registerAllowedEmail(email: string) {
+  if (email && !dynamicAllowedEmails.includes(email.trim().toLowerCase())) {
+    dynamicAllowedEmails.push(email.trim().toLowerCase());
+  }
+}
+
+export function setDynamicAllowedEmails(emails: string[]) {
+  dynamicAllowedEmails = emails.map((e) => e.trim().toLowerCase());
+}
 
 /**
  * Validates if an email is on the pre-approved admin allow-list
@@ -19,7 +37,7 @@ export const ADMIN_ALLOWLIST: string[] = [
 export function isEmailAllowed(email: string | null | undefined): boolean {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  return ADMIN_ALLOWLIST.includes(normalized);
+  return ADMIN_ALLOWLIST.includes(normalized) || dynamicAllowedEmails.includes(normalized);
 }
 
 export const MITRA_AUTH_COOKIE_NAME = 'mitra_auth_session';

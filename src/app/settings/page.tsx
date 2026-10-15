@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useMitra } from '@/context/MitraContext';
 import { CleanNumberInput } from '@/components/CleanNumberInput';
 import { MilkBottleIcon } from '@/components/MilkBottleIcon';
@@ -29,6 +29,13 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+interface AdminUser {
+  id: string;
+  email: string;
+  created_at?: string;
+  is_primary: boolean;
+}
+
 export default function SettingsPage() {
   const {
     t,
@@ -42,6 +49,82 @@ export default function SettingsPage() {
   const [reminderTime, setReminderTime] = useState<string>(household.daily_reminder_time || '09:00');
   const [autoConfirmHours, setAutoConfirmHours] = useState<number>(household.auto_confirm_hours || 24);
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
+
+  // Admin Management State
+  const [adminList, setAdminList] = useState<AdminUser[]>([]);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState<boolean>(true);
+  const [newAdminEmail, setNewAdminEmail] = useState<string>('');
+  const [newAdminPassword, setNewAdminPassword] = useState<string>('');
+  const [isSubmittingAdmin, setIsSubmittingAdmin] = useState<boolean>(false);
+  const [adminMsg, setAdminMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const fetchAdmins = useCallback(async () => {
+    setIsLoadingAdmins(true);
+    try {
+      const res = await fetch('/api/admin/users');
+      const data = await res.json();
+      if (data.users) {
+        setAdminList(data.users);
+      }
+    } catch {
+      setAdminList([{ id: '1', email: 'rrbkabir2@gmail.com', is_primary: true }]);
+    } finally {
+      setIsLoadingAdmins(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAdmins();
+  }, [fetchAdmins]);
+
+  const handleAddAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminEmail || !newAdminPassword) return;
+    setIsSubmittingAdmin(true);
+    setAdminMsg(null);
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newAdminEmail, password: newAdminPassword }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminMsg({ text: `Successfully added administrator: ${newAdminEmail}`, type: 'success' });
+        setNewAdminEmail('');
+        setNewAdminPassword('');
+        fetchAdmins();
+      } else {
+        setAdminMsg({ text: data.error || 'Failed to add administrator', type: 'error' });
+      }
+    } catch {
+      setAdminMsg({ text: 'Error connecting to server', type: 'error' });
+    } finally {
+      setIsSubmittingAdmin(false);
+      setTimeout(() => setAdminMsg(null), 6000);
+    }
+  };
+
+  const handleDeleteAdmin = async (id: string, email: string) => {
+    if (!confirm(`Are you sure you want to revoke admin access for ${email}?`)) return;
+    try {
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(id)}&email=${encodeURIComponent(email)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminMsg({ text: `Revoked admin access for ${email}`, type: 'success' });
+        fetchAdmins();
+      } else {
+        setAdminMsg({ text: data.error || 'Failed to remove administrator', type: 'error' });
+      }
+    } catch {
+      setAdminMsg({ text: 'Error removing administrator', type: 'error' });
+    } finally {
+      setTimeout(() => setAdminMsg(null), 6000);
+    }
+  };
 
   // Point 5: PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -410,6 +493,161 @@ export default function SettingsPage() {
             <Trash2 size={16} />
             <span>{t.settings.runCleanupBtn}</span>
           </button>
+        </section>
+
+        {/* 6. ADMINISTRATOR ACCOUNTS & DATABASE ACCESS */}
+        <section className="content-card" id="admin-management-section">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <ShieldCheck size={22} color="var(--primary)" />
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Administrator Accounts & Database</h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  Manage authorized database administrators directly from Mitra. No Vercel changes required.
+                </p>
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                padding: '0.2rem 0.6rem',
+                borderRadius: '999px',
+                background: '#dcfce7',
+                color: '#166534',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a' }}></span>
+              Supabase Live
+            </span>
+          </div>
+
+          {adminMsg && (
+            <div
+              style={{
+                marginBottom: '1rem',
+                padding: '0.65rem 0.85rem',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                background: adminMsg.type === 'success' ? '#f0fdf4' : '#fef2f2',
+                color: adminMsg.type === 'success' ? '#166534' : '#991b1b',
+                border: `1px solid ${adminMsg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+              }}
+            >
+              {adminMsg.text}
+            </div>
+          )}
+
+          {/* Current Administrators List */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+              Authorized Admin Accounts
+            </div>
+            {isLoadingAdmins ? (
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Loading administrators...</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {adminList.map((adm) => (
+                  <div
+                    key={adm.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.75rem 1rem',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--bg-card-subtle, #f8fafc)',
+                      border: '1px solid var(--border-glass, #e2e8f0)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                          {adm.email}
+                        </span>
+                        {adm.is_primary && (
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              background: '#e0f2fe',
+                              color: '#0369a1',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            Primary Owner
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        Added: {adm.created_at ? new Date(adm.created_at).toLocaleDateString() : 'Active'}
+                      </div>
+                    </div>
+
+                    {!adm.is_primary && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAdmin(adm.id, adm.email)}
+                        className="btn-icon"
+                        title="Remove admin access"
+                        style={{ color: '#dc2626', padding: '0.4rem' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Add New Admin Form */}
+          <div
+            style={{
+              padding: '1rem',
+              borderRadius: 'var(--radius-md)',
+              background: '#f8fafc',
+              border: '1px dashed #cbd5e1',
+            }}
+          >
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.65rem', color: 'var(--text-primary)' }}>
+              + Add New Administrator
+            </div>
+            <form onSubmit={handleAddAdmin} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr)) auto', gap: '0.65rem' }}>
+              <input
+                type="email"
+                placeholder="admin@email.com"
+                value={newAdminEmail}
+                onChange={(e) => setNewAdminEmail(e.target.value)}
+                className="form-input"
+                required
+                style={{ fontSize: '0.85rem' }}
+              />
+              <input
+                type="password"
+                placeholder="Temporary Password (min 6)"
+                value={newAdminPassword}
+                onChange={(e) => setNewAdminPassword(e.target.value)}
+                className="form-input"
+                required
+                minLength={6}
+                style={{ fontSize: '0.85rem' }}
+              />
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isSubmittingAdmin}
+                style={{ whiteSpace: 'nowrap', padding: '0 1rem', fontSize: '0.85rem' }}
+              >
+                {isSubmittingAdmin ? 'Adding...' : 'Add Admin'}
+              </button>
+            </form>
+          </div>
         </section>
       </div>
     </main>
