@@ -20,7 +20,7 @@ const DEFAULT_HOUSEHOLD: Household = {
   advanced_mode: false,
   auto_confirm_hours: 24,
   daily_reminder_time: '09:00:00',
-  created_at: new Date().toISOString(),
+  created_at: '2026-01-01T00:00:00.000Z',
 };
 
 const DEFAULT_VENDORS: Vendor[] = [
@@ -31,10 +31,10 @@ const DEFAULT_VENDORS: Vendor[] = [
     phone_number: '+91 98765 43210',
     vendor_type: 'dairy',
     access_token: 'ramesh_dairy_token_7f9c84e1a0b3d64821aef59012cd',
-    token_created_at: new Date().toISOString(),
+    token_created_at: '2026-01-01T00:00:00.000Z',
     is_active: true,
     auto_monthly_report: true,
-    created_at: new Date().toISOString(),
+    created_at: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'v-02',
@@ -43,10 +43,10 @@ const DEFAULT_VENDORS: Vendor[] = [
     phone_number: '+91 98123 45678',
     vendor_type: 'grocery',
     access_token: 'kisan_grocery_token_5e82a1b94d7620ef3c9147ba01da',
-    token_created_at: new Date().toISOString(),
+    token_created_at: '2026-01-01T00:00:00.000Z',
     is_active: true,
     auto_monthly_report: true,
-    created_at: new Date().toISOString(),
+    created_at: '2026-01-01T00:00:00.000Z',
   },
 ];
 
@@ -60,7 +60,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     default_price: 60,
     is_milk_type: true,
     milk_subtype: 'cow',
-    created_at: new Date().toISOString(),
+    created_at: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'prod-02',
@@ -71,7 +71,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     default_price: 75,
     is_milk_type: true,
     milk_subtype: 'buffalo',
-    created_at: new Date().toISOString(),
+    created_at: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'prod-03',
@@ -81,7 +81,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     unit_type: 'kilogram',
     default_price: 380,
     is_milk_type: false,
-    created_at: new Date().toISOString(),
+    created_at: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'prod-04',
@@ -91,7 +91,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     unit_type: 'count',
     default_price: 40,
     is_milk_type: false,
-    created_at: new Date().toISOString(),
+    created_at: '2026-01-01T00:00:00.000Z',
   },
 ];
 
@@ -238,7 +238,6 @@ class MitraStore {
   constructor() {
     if (typeof window !== 'undefined') {
       this.isClient = true;
-      this.loadFromStorage();
     }
   }
 
@@ -257,7 +256,7 @@ class MitraStore {
     }
   }
 
-  private loadFromStorage() {
+  public loadFromStorage() {
     if (!this.isClient) return;
     try {
       const h = localStorage.getItem('mitra_household');

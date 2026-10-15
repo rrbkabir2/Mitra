@@ -73,7 +73,7 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
   const [isDbConnected, setIsDbConnected] = useState<boolean>(isSupabaseConfigured);
 
-  // Sync state on store mutations
+  // Sync state on store mutations & hydrate client-persisted storage safely after initial mount
   useEffect(() => {
     const syncState = () => {
       setHousehold(mitraStore.getHousehold());
@@ -84,6 +84,10 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
       setPurchases(mitraStore.getPurchases());
       setWhatsappUsageCount(mitraStore.getWhatsAppUsageCount());
     };
+
+    // Load persisted localStorage safely on client after React has hydrated
+    mitraStore.loadFromStorage();
+    syncState();
 
     const unsubscribe = mitraStore.subscribe(syncState);
     return () => unsubscribe();

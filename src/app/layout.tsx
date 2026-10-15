@@ -37,12 +37,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="manifest" href="/manifest.json" />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <MitraProvider>
           <GlobalInputFixes />
           <div className="mitra-app">
