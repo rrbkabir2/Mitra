@@ -23,6 +23,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/v/') ||
     pathname.startsWith('/api/whatsapp/webhook') ||
     pathname.startsWith('/api/reminders/check') ||
+    pathname.startsWith('/api/keep-alive') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/manifest.json') ||

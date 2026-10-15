@@ -164,6 +164,64 @@ The platform includes built-in reactive storage pre-seeded with realistic data s
 
 ---
 
+## ⚡ Automated Supabase Keep-Alive (Free-Tier Auto-Pause Prevention)
+
+Supabase free-tier projects automatically pause after **7 days of inactivity**, requiring manual resumption via the Supabase dashboard. To guarantee Mitra remains uninterrupted as a daily-use household platform, an automated keep-alive system is configured.
+
+### 🛠️ Architecture & Components Configured
+
+| Component | Location | Description |
+| :--- | :--- | :--- |
+| **API Endpoint** | [`src/app/api/keep-alive/route.ts`](./src/app/api/keep-alive/route.ts) | A dynamic endpoint (`/api/keep-alive`) that executes a lightweight read query (`SELECT id, name FROM households LIMIT 1`) against Supabase. This registers real query activity with Supabase's PostgreSQL telemetry and resets the inactivity countdown. |
+| **Public Middleware Bypass** | [`src/middleware.ts`](./src/middleware.ts) | Whitelists `/api/keep-alive` from session cookie requirements so automated pingers can query it. |
+| **Automated Cron Workflow** | [`.github/workflows/supabase-keep-alive.yml`](./.github/workflows/supabase-keep-alive.yml) | A zero-cost GitHub Actions workflow scheduled every **2 days** (`0 4 */2 * *`), well within the 7-day pause window. Pings both the deployed Vercel application endpoint and directly queries the Supabase REST API as a safety net. |
+
+### 🔍 Verification & Monitoring
+
+1. **Verify Endpoint Locally or in Production**:
+   ```bash
+   curl -s https://mitra-beryl.vercel.app/api/keep-alive
+   ```
+   **Expected Response (HTTP 200)**:
+   ```json
+   {
+     "status": "ok",
+     "service": "mitra-delivery-platform",
+     "action": "supabase-keep-alive",
+     "timestamp": "2026-10-15T06:41:38.607Z",
+     "database": {
+       "configured": true,
+       "status": "healthy_active",
+       "latencyMs": 763,
+       "recordsFound": 1,
+       "error": null
+     },
+     "timing": { "totalMs": 763 },
+     "keepAliveGuarantee": "PostgreSQL read transaction executed to prevent free-tier auto-pause."
+   }
+   ```
+
+2. **Verify on GitHub**:
+   - Navigate to your repository's **Actions** tab: [https://github.com/rrbkabir2/Mitra/actions](https://github.com/rrbkabir2/Mitra/actions)
+   - Select **Supabase Database Keep-Alive**.
+   - Click **Run workflow** &rarr; **Run workflow** to test execution on demand.
+
+3. **Optional External Uptime Pingers**:
+   You can also point any free external uptime monitor (e.g., [Cron-Job.org](https://cron-job.org/), [UptimeRobot](https://uptimerobot.com/), or [BetterUptime](https://betteruptime.com/)) to:
+   ```text
+   https://mitra-beryl.vercel.app/api/keep-alive
+   ```
+   Set the interval to once every 24 or 48 hours.
+
+### 🛑 Reconfiguration or Disabling (When Upgrading to Paid Tier)
+
+If Mitra is migrated to a paid Supabase plan (Pro, Team, or Enterprise), projects never pause, making this keep-alive job optional.
+
+- **To Disable**: Delete `.github/workflows/supabase-keep-alive.yml` or go to **GitHub** &rarr; **Actions** &rarr; **Supabase Database Keep-Alive** &rarr; click **...** (overflow menu) &rarr; **Disable workflow**.
+- **To Reconfigure Target URL**: If your domain changes from `mitra-beryl.vercel.app`, update the target URL in `.github/workflows/supabase-keep-alive.yml`.
+
+---
+
 ## 🔒 Security Architecture
 
 For detailed information on database triggers, RLS policies, webhook HMAC verification, and token rotation, please read our dedicated [SECURITY.md](./SECURITY.md) document.

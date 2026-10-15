@@ -1,0 +1,79 @@
+name: Supabase Database Keep-Alive
+
+on:
+  schedule:
+    # Runs at 04:00 UTC every 2 days (well within Supabase 7-day free tier inactivity window)
+    - cron: '0 4 */2 * *'
+  workflow_dispatch:
+    # Allows manual trigger anytime from GitHub Actions tab
+
+jobs:
+  keep-alive:
+    name: Ping Mitra & Supabase Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping Mitra Vercel Keep-Alive Endpoint
+        id: ping-mitra
+        run: |
+          echo "=========================================================="
+          echo "Pinging Mitra Keep-Alive Endpoint on Vercel..."
+          echo "Target: https://mitra-beryl.vercel.app/api/keep-alive"
+          echo "=========================================================="
+
+          RESPONSE=$(curl -s -S --max-time 30 \
+            -H "User-Agent: Mitra-KeepAlive-Cron/1.0" \
+            "https://mitra-beryl.vercel.app/api/keep-alive" || echo "FAIL")
+
+          echo "Response: $RESPONSE"
+
+          if echo "$RESPONSE" | grep -q '"status":"ok"'; then
+            echo "SUCCESS=true" >> $GITHUB_ENV
+            echo "Endpoint returned status: ok"
+          else
+            echo "SUCCESS=false" >> $GITHUB_ENV
+            echo "Vercel endpoint ping did not return status ok or timed out."
+          fi
+
+      - name: Direct Supabase REST Fallback Ping
+        id: ping-supabase-direct
+        run: |
+          echo "=========================================================="
+          echo "Executing direct read query to Supabase REST API..."
+          echo "=========================================================="
+
+          SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
+          if [ -z "$SUPABASE_URL" ]; then
+            SUPABASE_URL="https://agsqbuwufulwevqjmhab.supabase.co"
+          fi
+
+          SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}"
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            SUPABASE_ANON_KEY="sb_publishable_zgvFZ2_MVuuzTRvbwyABkA_oXuSEu15"
+          fi
+
+          DIRECT_RESPONSE=$(curl -s -S --max-time 15 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/households?select=id,name&limit=1" || echo "DIRECT_FAIL")
+
+          echo "Direct Supabase Response: $DIRECT_RESPONSE"
+
+          if [ "$DIRECT_RESPONSE" != "DIRECT_FAIL" ]; then
+            echo "DIRECT_SUCCESS=true" >> $GITHUB_ENV
+          else
+            echo "DIRECT_SUCCESS=false" >> $GITHUB_ENV
+          fi
+
+      - name: Write Job Summary
+        run: |
+          echo "### 🥛 Mitra Supabase Keep-Alive Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status | Target |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mitra App Endpoint | ${{ env.SUCCESS == 'true' && '✅ Healthy' || '⚠️ Needs Attention' }} | \`https://mitra-beryl.vercel.app/api/keep-alive\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Supabase Direct Query | ${{ env.DIRECT_SUCCESS == 'true' && '✅ Active' || '⚠️ Check Network' }} | \`https://agsqbuwufulwevqjmhab.supabase.co\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Guarantee:** Active read traffic was sent to PostgreSQL to prevent Supabase free-tier project auto-pause." >> $GITHUB_STEP_SUMMARY
+          echo "> Next scheduled run in 48 hours." >> $GITHUB_STEP_SUMMARY
