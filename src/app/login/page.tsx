@@ -44,22 +44,13 @@ function LoginForm() {
     setIsLoading(true);
     setErrorMsg('');
 
-    // Point 4: Allow-list check
-    if (!isEmailAllowed(email)) {
-      setErrorMsg(
-        'Access Denied: Only pre-approved administrator accounts may sign in. Public self-serve registration is strictly disabled.'
-      );
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const ok = await loginAdmin(email, password);
       if (ok) {
         const redirect = searchParams.get('redirect') || '/';
         router.push(redirect);
       } else {
-        setErrorMsg('Invalid credentials or unauthorized account.');
+        setErrorMsg('Invalid credentials. Only pre-approved database administrator accounts may sign in.');
         setIsLoading(false);
       }
     } catch (err: unknown) {

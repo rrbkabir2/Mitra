@@ -22,7 +22,21 @@ CREATE TABLE IF NOT EXISTS households (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 2. Vendors
+-- 2. Admins (Authorized household administrators)
+CREATE TABLE IF NOT EXISTS admins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id UUID REFERENCES households(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    name TEXT NOT NULL DEFAULT 'Kabir Bundele',
+    email TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL DEFAULT 'owner' CHECK (role IN ('owner', 'admin')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admins_email ON admins(email);
+CREATE INDEX IF NOT EXISTS idx_admins_household ON admins(household_id);
+
+-- 3. Vendors
 CREATE TABLE IF NOT EXISTS vendors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -204,6 +218,7 @@ EXECUTE FUNCTION enforce_tamper_proof_status();
 
 -- Row Level Security (RLS)
 ALTER TABLE households ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entries ENABLE ROW LEVEL SECURITY;
@@ -217,6 +232,11 @@ DROP POLICY IF EXISTS "Admins can view their own household" ON households;
 CREATE POLICY "Admins can view their own household"
     ON households FOR SELECT
     USING (admin_id = auth.uid());
+
+DROP POLICY IF EXISTS "Admins can view and manage admins" ON admins;
+CREATE POLICY "Admins can view and manage admins"
+    ON admins FOR ALL
+    USING (auth.role() = 'authenticated');
 
 DROP POLICY IF EXISTS "Admins can update their own household" ON households;
 CREATE POLICY "Admins can update their own household"
@@ -317,3 +337,9 @@ BEGIN
     RETURN FOUND;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Seed default primary admin
+INSERT INTO admins (name, email, role)
+VALUES ('Kabir Bundele', 'rrbkabir2@gmail.com', 'owner')
+ON CONFLICT (email) DO NOTHING;
+

@@ -86,6 +86,20 @@ export async function POST(request: NextRequest) {
     // 2. Fetch primary household to associate
     const { data: hh } = await supabase.from('households').select('id').limit(1).maybeSingle();
 
+    // 3. Record in database admins table
+    try {
+      await supabase.from('admins').upsert(
+        {
+          user_id: authData.user.id,
+          household_id: hh?.id,
+          email: normalizedEmail,
+          name: normalizedEmail.split('@')[0],
+          role: 'admin',
+        },
+        { onConflict: 'email' }
+      );
+    } catch {}
+
     return NextResponse.json({
       success: true,
       user: {
@@ -127,6 +141,11 @@ export async function DELETE(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Delete from admins table
+    try {
+      await supabase.from('admins').delete().eq('email', userEmail?.toLowerCase());
+    } catch {}
 
     const { error: delError } = await supabase.auth.admin.deleteUser(userId);
     if (delError) {

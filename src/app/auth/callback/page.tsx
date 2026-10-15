@@ -44,17 +44,36 @@ export default function AuthCallbackPage() {
     }
 
     async function verifyAndRedirect(email: string) {
-      if (isEmailAllowed(email)) {
+      const normalizedEmail = email.trim().toLowerCase();
+      let isAuthorized = normalizedEmail === 'rrbkabir2@gmail.com';
+
+      if (!isAuthorized && supabase) {
+        try {
+          const { data } = await supabase
+            .from('admins')
+            .select('email')
+            .eq('email', normalizedEmail)
+            .maybeSingle();
+
+          if (data?.email) {
+            isAuthorized = true;
+          }
+        } catch {
+          // fallback
+        }
+      }
+
+      if (isAuthorized) {
         // Authorized administrator!
-        setClientAuthCookie(email);
+        setClientAuthCookie(normalizedEmail);
         router.push('/');
       } else {
-        // REJECT: Not on the allow-list!
+        // REJECT: Not registered as an administrator in the database!
         clearClientAuthCookie();
         if (supabase) {
           await supabase.auth.signOut();
         }
-        router.push(`/login?error=unauthorized_email&email=${encodeURIComponent(email)}`);
+        router.push(`/login?error=unauthorized_email&email=${encodeURIComponent(normalizedEmail)}`);
       }
     }
 

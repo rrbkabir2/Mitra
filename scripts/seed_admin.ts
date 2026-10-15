@@ -92,6 +92,22 @@ async function seedAdmin() {
   }
 
   console.log(`Household created: ${household.id} ("${household.name}")`);
+
+  // 3. Create corresponding entry in admins table
+  try {
+    await supabase.from('admins').upsert(
+      {
+        user_id: userId,
+        household_id: household.id,
+        name: householdName,
+        email: email,
+        role: 'owner',
+      },
+      { onConflict: 'email' }
+    );
+    console.log(`Admin record linked in database: ${email} (Owner)`);
+  } catch (e) {}
+
   console.log('\nAdmin provisioning complete! You can now log into Mitra.');
 }
 

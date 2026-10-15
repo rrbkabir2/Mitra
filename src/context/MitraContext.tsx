@@ -216,31 +216,32 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Point 2 & 4: Admin login with allow-list check
+  // Point 2 & 4: Admin login directly authenticated via Supabase database
   const loginAdmin = async (email: string, pass: string): Promise<boolean> => {
-    if (!isEmailAllowed(email)) {
-      throw new Error('Access denied: Email is not on the administrator allow-list.');
-    }
+    const cleanEmail = email.trim().toLowerCase();
 
     // Try Supabase auth if configured
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: cleanEmail,
         password: pass,
       });
 
       if (!error && data?.user) {
         setIsAdminLoggedIn(true);
-        setClientAuthCookie(email);
+        setClientAuthCookie(cleanEmail);
         await fetchSupabaseData();
         return true;
       }
+      if (error) {
+        throw new Error(error.message);
+      }
     }
 
-    // Fallback: Verified local admin password validation (for development or seed admin)
-    if (pass.length >= 6) {
+    // Fallback: Local offline admin password validation (for local seed development)
+    if (cleanEmail === 'rrbkabir2@gmail.com' && pass.length >= 6) {
       setIsAdminLoggedIn(true);
-      setClientAuthCookie(email);
+      setClientAuthCookie(cleanEmail);
       return true;
     }
 
