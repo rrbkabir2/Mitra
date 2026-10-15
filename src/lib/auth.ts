@@ -36,7 +36,10 @@ export function setDynamicAllowedEmails(emails: string[]) {
  */
 export function isEmailAllowed(email: string | null | undefined): boolean {
   if (!email) return false;
-  const normalized = email.trim().toLowerCase();
+  let normalized = email.trim().toLowerCase();
+  try {
+    normalized = decodeURIComponent(normalized);
+  } catch {}
   return ADMIN_ALLOWLIST.includes(normalized) || dynamicAllowedEmails.includes(normalized);
 }
 
@@ -61,17 +64,22 @@ export function clearClientAuthCookie() {
 
 export function getClientAuthCookie(): string | null {
   if (typeof document === 'undefined') return null;
-  const name = `${MITRA_AUTH_COOKIE_NAME}=`;
-  const decodedCookie = decodeURIComponent(document.cookie);
-  const ca = decodedCookie.split(';');
-  for (let i = 0; i < ca.length; i++) {
-    let c = ca[i];
-    while (c.charAt(0) === ' ') {
-      c = c.substring(1);
+  try {
+    const name = `${MITRA_AUTH_COOKIE_NAME}=`;
+    const ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+      const c = ca[i].trim();
+      if (c.indexOf(name) === 0) {
+        const raw = c.substring(name.length);
+        try {
+          return decodeURIComponent(raw);
+        } catch {
+          return raw;
+        }
+      }
     }
-    if (c.indexOf(name) === 0) {
-      return c.substring(name.length, c.length);
-    }
+    return null;
+  } catch {
+    return null;
   }
-  return null;
 }

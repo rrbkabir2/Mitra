@@ -42,6 +42,7 @@ export default function TodayPage() {
     entries,
     household,
     isAdminLoggedIn,
+    isLoadingAuth,
     addDeliveryEntry,
     markTodayAbsent,
     addPurchase,
@@ -101,6 +102,20 @@ export default function TodayPage() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlinePhotoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // While verifying session cookie / Supabase session, show gentle loading placeholder
+  if (isLoadingAuth) {
+    return (
+      <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '65vh' }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <div className="brand-logo-bottle" style={{ margin: '0 auto 1rem auto', width: 48, height: 48 }}>
+            <MilkBottleIcon size={28} fillColor="#ffffff" />
+          </div>
+          <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Loading Mitra Platform...</p>
+        </div>
+      </main>
+    );
+  }
 
   // If admin is not logged in, show login prompt
   if (!isAdminLoggedIn) {

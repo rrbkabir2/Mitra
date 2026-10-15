@@ -66,7 +66,11 @@ export default function AuthCallbackPage() {
       if (isAuthorized) {
         // Authorized administrator!
         setClientAuthCookie(normalizedEmail);
-        router.push('/');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        } else {
+          router.push('/');
+        }
       } else {
         // REJECT: Not registered as an administrator in the database!
         clearClientAuthCookie();

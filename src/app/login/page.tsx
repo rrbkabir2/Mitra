@@ -24,9 +24,11 @@ function LoginForm() {
   useEffect(() => {
     if (isAdminLoggedIn) {
       const redirect = searchParams.get('redirect') || '/';
-      router.push(redirect);
+      if (typeof window !== 'undefined') {
+        window.location.href = redirect;
+      }
     }
-  }, [isAdminLoggedIn, router, searchParams]);
+  }, [isAdminLoggedIn, searchParams]);
 
   // Check for rejected OAuth redirect
   useEffect(() => {
@@ -48,7 +50,11 @@ function LoginForm() {
       const ok = await loginAdmin(email, password);
       if (ok) {
         const redirect = searchParams.get('redirect') || '/';
-        router.push(redirect);
+        if (typeof window !== 'undefined') {
+          window.location.href = redirect;
+        } else {
+          router.push(redirect);
+        }
       } else {
         setErrorMsg('Invalid credentials. Only pre-approved database administrator accounts may sign in.');
         setIsLoading(false);
