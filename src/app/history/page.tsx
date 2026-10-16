@@ -27,20 +27,27 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle2,
+  Download,
+  Printer,
+  Users,
+  FileText,
 } from 'lucide-react';
 
 export default function HistoryPage() {
-  const { t, entries, vendors, products, editDeliveryEntry, deleteDeliveryEntry } = useMitra();
+  const { t, entries, vendors, products, household, editDeliveryEntry, deleteDeliveryEntry } = useMitra();
 
-  // Point 6: Identical Delivery History Filter Pattern as Homepage
+  // Point 6 & 20: Delivery History Filter Pattern with Custom Date Range & Vendor Filter
   const now = new Date();
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const currentYearStr = String(now.getFullYear());
   const todayDateStr = now.toISOString().split('T')[0];
 
-  const [deliveryFilter, setDeliveryFilter] = useState<'today' | 'month' | 'year' | 'all' | 'ledger'>('month');
+  const [deliveryFilter, setDeliveryFilter] = useState<'today' | 'month' | 'year' | 'range' | 'all' | 'ledger'>('month');
   const [filterMonth, setFilterMonth] = useState<string>(currentMonthStr);
   const [filterYear, setFilterYear] = useState<string>(currentYearStr);
+  const [fromMonth, setFromMonth] = useState<string>(`${now.getFullYear()}-01`);
+  const [toMonth, setToMonth] = useState<string>(currentMonthStr);
+  const [selectedVendorFilter, setSelectedVendorFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | EntryStatus>('all');
   const [dateSearch, setDateSearch] = useState<string>('');
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
@@ -110,9 +117,9 @@ export default function HistoryPage() {
     }
   };
 
-  // Filter entries based on the unified filter pattern
+  // Filter entries based on the unified filter pattern & custom range + vendor options (Requirement 20)
   const filteredEntries = entries.filter((entry) => {
-    // 1. Date Range Filter (Today, Month, Year, All/Ledger)
+    // 1. Date Range Filter (Today, Month, Year, Custom Multi-Month Range, All/Ledger)
     if (deliveryFilter === 'today' && entry.entry_date !== todayDateStr) {
       return false;
     }
@@ -122,13 +129,25 @@ export default function HistoryPage() {
     if (deliveryFilter === 'year' && !entry.entry_date.startsWith(filterYear)) {
       return false;
     }
+    if (deliveryFilter === 'range') {
+      const entryMonth = entry.entry_date.substring(0, 7);
+      const minM = fromMonth <= toMonth ? fromMonth : toMonth;
+      const maxM = fromMonth <= toMonth ? toMonth : fromMonth;
+      if (minM && entryMonth < minM) return false;
+      if (maxM && entryMonth > maxM) return false;
+    }
 
     // 2. Specific Date Search
     if (dateSearch && !entry.entry_date.includes(dateSearch)) {
       return false;
     }
 
-    // 3. Status Filter (Point 8: supports auto-confirmed as well as confirmed)
+    // 3. Vendor Filter (Optional: Narrow to one vendor or include all)
+    if (selectedVendorFilter !== 'all' && entry.vendor_id !== selectedVendorFilter) {
+      return false;
+    }
+
+    // 4. Status Filter (Point 8: supports auto-confirmed as well as confirmed)
     if (statusFilter !== 'all') {
       if (statusFilter === 'confirmed') {
         if (entry.status !== 'confirmed') return false;
@@ -164,6 +183,108 @@ export default function HistoryPage() {
     navigator.clipboard.writeText(proofUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  // Requirement 20: Filter Labels & Downloadable Export Generator
+  const getFilterDescription = () => {
+    let dateStr = 'All Historical Records';
+    if (deliveryFilter === 'today') {
+      dateStr = `Today (${todayDateStr})`;
+    } else if (deliveryFilter === 'month') {
+      dateStr = `Single Month: ${filterMonth}`;
+    } else if (deliveryFilter === 'year') {
+      dateStr = `Calendar Year: ${filterYear}`;
+    } else if (deliveryFilter === 'range') {
+      dateStr = `Multi-Month Range: ${fromMonth || 'Start'} through ${toMonth || 'Present'}`;
+    } else if (deliveryFilter === 'ledger') {
+      dateStr = 'Full Comprehensive Ledger';
+    }
+    if (dateSearch) {
+      dateStr += ` (Specific Search: "${dateSearch}")`;
+    }
+
+    const statusStr =
+      statusFilter === 'all'
+        ? 'All Statuses (Pending, Confirmed, Auto-Confirmed, Denied, Absent)'
+        : statusFilter === 'auto-confirmed'
+        ? 'Auto-Confirmed (24h System Timer)'
+        : statusFilter.toUpperCase();
+
+    const vendorObj = vendors.find((v) => v.id === selectedVendorFilter);
+    const vendorStr =
+      selectedVendorFilter === 'all'
+        ? 'All Vendors'
+        : vendorObj
+        ? `${vendorObj.name} (${vendorObj.vendor_type}, Phone: ${vendorObj.phone_number})`
+        : selectedVendorFilter;
+
+    return { dateStr, statusStr, vendorStr };
+  };
+
+  const generatePlainTextLedger = (): string => {
+    const { dateStr, statusStr, vendorStr } = getFilterDescription();
+    const lines: string[] = [];
+    lines.push(`================================================================================`);
+    lines.push(`                    MITRA DELIVERY CONFIRMATION LEDGER                          `);
+    lines.push(`================================================================================`);
+    lines.push(`Household:            ${household?.name || 'Household'}`);
+    lines.push(`Date Range Filter:    ${dateStr}`);
+    lines.push(`Status Filter:        ${statusStr}`);
+    lines.push(`Vendor Scope:         ${vendorStr}`);
+    lines.push(`Export Generated At:  ${new Date().toLocaleString()}`);
+    lines.push(`--------------------------------------------------------------------------------`);
+    lines.push(`Date        Time   Vendor          Qty (L)   Rate (₹)  Total (₹)  Status          Details`);
+    lines.push(`--------------------------------------------------------------------------------`);
+
+    filteredEntries
+      .slice()
+      .sort((a, b) => (a.entry_date > b.entry_date ? 1 : a.entry_date < b.entry_date ? -1 : (a.entry_time || '') > (b.entry_time || '') ? 1 : -1))
+      .forEach((entry) => {
+        const dateCol = entry.entry_date.padEnd(12, ' ');
+        const timeCol = (entry.entry_time || '--:--').padEnd(7, ' ');
+        const vendorCol = getVendorName(entry.vendor_id).substring(0, 14).padEnd(16, ' ');
+        const qtyCol = (entry.status === 'absent' ? '0.0 (Abs)' : `${entry.quantity}`).padEnd(10, ' ');
+        const rateCol = `₹${entry.unit_price}`.padEnd(10, ' ');
+        const totalCol = `₹${entry.total_price}`.padEnd(11, ' ');
+        const statusCol = (entry.status === 'auto-confirmed' || (entry.status === 'confirmed' && entry.status_set_by === 'system_auto')
+          ? 'auto-confirmed'
+          : entry.status).padEnd(16, ' ');
+        const detailsCol = entry.is_corrected ? '[Corrected Entry]' : entry.notes ? entry.notes : '';
+        lines.push(`${dateCol}${timeCol}${vendorCol}${qtyCol}${rateCol}${totalCol}${statusCol}${detailsCol}`);
+      });
+
+    lines.push(`--------------------------------------------------------------------------------`);
+    lines.push(`FILTERED AGGREGATE SUMMARY:`);
+    lines.push(`Total Volume Delivered:  ${filteredLitres.toFixed(1)} Litres`);
+    lines.push(`Total Payable Amount:    ₹${filteredTotalSpend.toLocaleString()}`);
+    lines.push(`Total Records Filtered:  ${filteredEntries.length} entries`);
+    lines.push(`Vendor Confirmed:        ${filteredEntries.filter((e) => e.status === 'confirmed' && e.status_set_by !== 'system_auto').length} entries`);
+    lines.push(`System Auto-Confirmed:   ${filteredEntries.filter((e) => e.status === 'auto-confirmed' || (e.status === 'confirmed' && e.status_set_by === 'system_auto')).length} entries`);
+    lines.push(`Pending Confirmations:   ${filteredEntries.filter((e) => e.status === 'pending').length} entries`);
+    lines.push(`Absent Days:             ${filteredEntries.filter((e) => e.status === 'absent').length} days`);
+    lines.push(`================================================================================`);
+    lines.push(`Tamper-proof permanent records verified by Mitra Delivery Confirmation Platform.`);
+    return lines.join('\n');
+  };
+
+  const handleDownloadExport = () => {
+    const text = generatePlainTextLedger();
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const vendorSlug = selectedVendorFilter !== 'all' ? `_${getVendorName(selectedVendorFilter).replace(/\s+/g, '_')}` : '';
+    const dateSlug = deliveryFilter === 'range' ? `_${fromMonth}_to_${toMonth}` : deliveryFilter === 'month' ? `_${filterMonth}` : `_${deliveryFilter}`;
+    const statusSlug = statusFilter !== 'all' ? `_${statusFilter}` : '';
+    a.download = `Mitra_Ledger_${(household?.name || 'Household').replace(/\s+/g, '_')}${dateSlug}${vendorSlug}${statusSlug}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setActionToast('Filtered delivery history exported successfully!');
+    setTimeout(() => setActionToast(null), 4000);
+  };
+
+  const handlePrintPdf = () => {
+    window.print();
   };
 
   return (
@@ -215,9 +336,9 @@ export default function HistoryPage() {
       </div>
 
       {/* =========================================================================
-          POINT 6: UNIFIED FILTER TOOLBAR (MATCHING HOMEPAGE EXACT PATTERN)
+          POINT 6 & 20: UNIFIED FILTER TOOLBAR WITH CUSTOM RANGE & VENDOR FILTER
           ========================================================================= */}
-      <section className="content-card" style={{ marginBottom: '1.25rem' }}>
+      <section className="content-card btn-print-hide" style={{ marginBottom: '1.25rem' }}>
         <div className="filter-toolbar">
           <div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827' }}>
@@ -230,6 +351,8 @@ export default function HistoryPage() {
                 ? `Filtered by month: ${filterMonth}`
                 : deliveryFilter === 'year'
                 ? `Filtered by year: ${filterYear}`
+                : deliveryFilter === 'range'
+                ? `Filtered by range: ${fromMonth} through ${toMonth}`
                 : deliveryFilter === 'ledger'
                 ? 'Full Comprehensive Ledger'
                 : 'Showing all historical entries'}
@@ -262,6 +385,14 @@ export default function HistoryPage() {
                 id="btn-history-filter-year"
               >
                 Year
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${deliveryFilter === 'range' ? 'active' : ''}`}
+                onClick={() => setDeliveryFilter('range')}
+                id="btn-history-filter-range"
+              >
+                Range
               </button>
               <button
                 type="button"
@@ -307,10 +438,34 @@ export default function HistoryPage() {
                 <option value="2024">2024</option>
               </select>
             )}
+
+            {/* If Range Filter chosen: show Multi-Month Date Range Pickers (Requirement 20) */}
+            {deliveryFilter === 'range' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', background: '#f8fafc', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>From:</span>
+                <input
+                  type="month"
+                  value={fromMonth}
+                  onChange={(e) => setFromMonth(e.target.value)}
+                  className="form-input"
+                  style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.8rem', fontWeight: 700 }}
+                  id="select-history-from-month"
+                />
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>To:</span>
+                <input
+                  type="month"
+                  value={toMonth}
+                  onChange={(e) => setToMonth(e.target.value)}
+                  className="form-input"
+                  style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.8rem', fontWeight: 700 }}
+                  id="select-history-to-month"
+                />
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Secondary Status Filter & Specific Date Search */}
+        {/* Secondary Row: Status Pills, Vendor Filter & Specific Date Search */}
         <div
           style={{
             display: 'flex',
@@ -356,34 +511,58 @@ export default function HistoryPage() {
             ))}
           </div>
 
-          {/* Date Filter Input */}
-          <div style={{ position: 'relative', width: '170px' }}>
-            <input
-              type="date"
-              value={dateSearch}
-              onChange={(e) => setDateSearch(e.target.value)}
-              className="form-input"
-              style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
-              aria-label={t.history.searchDate}
-              placeholder="Filter specific date"
-            />
-            {dateSearch && (
-              <button
-                onClick={() => setDateSearch('')}
-                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+          {/* Vendor Filter (Requirement 20) & Specific Date Search */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Vendor Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Users size={14} color="#64748b" />
+              <select
+                value={selectedVendorFilter}
+                onChange={(e) => setSelectedVendorFilter(e.target.value)}
+                className="form-select"
+                style={{ width: 'auto', padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 600, background: '#fff' }}
+                id="select-history-vendor"
+                aria-label="Filter by Vendor"
               >
-                <X size={14} />
-              </button>
-            )}
+                <option value="all">All Vendors</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} ({v.vendor_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date Search Input */}
+            <div style={{ position: 'relative', width: '160px' }}>
+              <input
+                type="date"
+                value={dateSearch}
+                onChange={(e) => setDateSearch(e.target.value)}
+                className="form-input"
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
+                aria-label={t.history.searchDate}
+                placeholder="Specific date"
+              />
+              {dateSearch && (
+                <button
+                  onClick={() => setDateSearch('')}
+                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Filter Summary Stats */}
+        {/* Filter Summary Stats & Downloadable Export Trigger (Requirement 20) */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '1.5rem',
+            justifyContent: 'space-between',
+            gap: '1rem',
             marginTop: '0.85rem',
             paddingTop: '0.85rem',
             borderTop: '1px solid #f1f5f9',
@@ -391,20 +570,95 @@ export default function HistoryPage() {
             flexWrap: 'wrap',
           }}
         >
-          <div>
-            <span style={{ color: '#64748b' }}>Deliveries: </span>
-            <strong style={{ color: '#111827' }}>{filteredEntries.length} records</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ color: '#64748b' }}>Deliveries: </span>
+              <strong style={{ color: '#111827' }}>{filteredEntries.length} records</strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Volume: </span>
+              <strong style={{ color: '#183d2d' }}>{filteredLitres.toFixed(1)} Litres</strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Total Spend: </span>
+              <strong style={{ color: '#183d2d' }}>₹{filteredTotalSpend.toLocaleString()}</strong>
+            </div>
           </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Volume: </span>
-            <strong style={{ color: '#183d2d' }}>{filteredLitres.toFixed(1)} Litres</strong>
-          </div>
-          <div>
-            <span style={{ color: '#64748b' }}>Total Spend: </span>
-            <strong style={{ color: '#183d2d' }}>₹{filteredTotalSpend.toLocaleString()}</strong>
+
+          {/* Action Row: Download Export File & Print / PDF */}
+          <div className="btn-print-hide" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleDownloadExport}
+              className="btn-primary"
+              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#183d2d', borderColor: '#183d2d' }}
+              id="btn-download-history-export"
+              title="Download Filtered Delivery History Statement"
+            >
+              <Download size={14} />
+              <span>Download Export</span>
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintPdf}
+              className="btn-secondary"
+              style={{ fontSize: '0.78rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              id="btn-print-history-pdf"
+              title="Print or Save as PDF"
+            >
+              <Printer size={14} />
+              <span>Print / PDF</span>
+            </button>
           </div>
         </div>
       </section>
+
+      {/* Printable Statement Sheet Header (Active during Print / PDF generation) */}
+      <div
+        className="printable-statement-header"
+        style={{
+          display: 'none',
+          borderBottom: '2px solid #183d2d',
+          paddingBottom: '0.85rem',
+          marginBottom: '1rem',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#183d2d', margin: 0 }}>
+              Mitra Delivery Confirmation Ledger
+            </h2>
+            <p style={{ fontSize: '0.84rem', color: '#475569', marginTop: '0.2rem' }}>
+              Household: <strong>{household?.name || 'Household'}</strong>
+            </p>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#64748b' }}>
+            <div>Export Date: {new Date().toLocaleDateString()}</div>
+            <div>Time: {new Date().toLocaleTimeString()}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginTop: '0.75rem', background: '#f8fafc', padding: '0.65rem 0.85rem', borderRadius: '4px', fontSize: '0.8rem' }}>
+          <div>
+            <span style={{ color: '#64748b' }}>Date Range Filter:</span><br />
+            <strong>{getFilterDescription().dateStr}</strong>
+          </div>
+          <div>
+            <span style={{ color: '#64748b' }}>Status Filter:</span><br />
+            <strong>{getFilterDescription().statusStr}</strong>
+          </div>
+          <div>
+            <span style={{ color: '#64748b' }}>Vendor Scope:</span><br />
+            <strong>{getFilterDescription().vendorStr}</strong>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.65rem', fontSize: '0.82rem', fontWeight: 700, color: '#183d2d' }}>
+          <span>Total Records: {filteredEntries.length}</span>
+          <span>Delivered Milk: {filteredLitres.toFixed(1)} L</span>
+          <span>Total Spend: ₹{filteredTotalSpend.toLocaleString()}</span>
+        </div>
+      </div>
 
       {/* Row-by-Row Ledger Cards */}
       {filteredEntries.length === 0 ? (

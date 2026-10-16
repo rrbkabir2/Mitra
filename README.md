@@ -68,13 +68,16 @@ In India and many parts of the world, households order daily milk and provisions
 - **3x2 Grid**: 0.5L, 1.0L, 1.5L, 2.0L, 2+L Custom Stepper, and Absent.
 - **Milk Variety Toggle**: Cow Milk (गाय का दूध) vs Buffalo Milk (भैंस का दूध) with active rate display.
 - **Quick Entry Modal**: Pre-filled quantity, delivery time, and calculated price.
-- **Bundled Extra Items**: Add curd, paneer, or catalog extras to save on messaging quotas.
+- **Collapsed Extra Items**: Hidden by default as a single compact button (`+ Extra Items`) to keep the quick-entry modal fast and clean for everyday milk logging. Opens into the catalog and custom product picker only upon tap.
+- **Bundled Extras**: Add curd, paneer, or catalog extras to save on messaging quotas.
 - **Client-Side Photo Compression**: HTML5 Canvas compresses smartphone camera photos from 4MB to <150KB before upload.
 - **One-Tap Absent**: Marks 0 Litres and alerts the vendor that no milk was delivered today.
 - **Inline Correction & Detail Modal**: Tap any recorded entry to view photo proof, launch inline corrections, or delete entries with vendor re-notification.
 
 ### 2. Delivery History
-- Comprehensive timeframe filters: **Today**, **Month**, **Year**, **All**, and **Full Ledger**.
+- Comprehensive timeframe filters: **Today**, **Month**, **Year**, **Custom Date Range (Multi-Month From/To)**, **All**, and **Full Ledger**.
+- **Vendor Filter**: Narrow records down to an individual vendor or view all vendors combined.
+- **Filtered Downloadable Export**: One-click **Download Export** file (`.txt`) and **Print / PDF** reflecting the active filters (Date Range, Status, and Vendor) clearly labeled at the top of the statement.
 - Row-by-row immutable ledger with date, items, total, and read-only status badges.
 - Detail modal with photo proof, audit trail, correction history, and shareable vendor proof link.
 - Action triggers for transparent editing and entry deletion.
