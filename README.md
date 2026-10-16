@@ -284,6 +284,24 @@ If Mitra is migrated to a paid Supabase plan (Pro, Team, or Enterprise), project
 
 ---
 
+## 📱 Release Enhancements (Tasks 29 – 31)
+
+### 29. Login Page Privacy Protection (Task 29)
+- **Generic Placeholder:** Replaced real personal email from the login input placeholder with generic `name@example.com`.
+- **Sanitized Error Messaging:** Updated unauthorized access rejection messages to refer generally to pre-approved administrator accounts rather than displaying private email addresses.
+
+### 30. Google Sign-In Reliable OAuth Flow (Task 30)
+- **Direct Account Picker Launch:** Guaranteed trigger of Google OAuth flow by directly navigating to Supabase OAuth provider authorize endpoint (`prompt=select_account`).
+- **Production Fallback Configuration:** Embedded fallback configuration in `src/lib/supabase.ts` ensuring that client builds on Vercel without manually injected client environment variables initialize correctly.
+
+### 31. Branded Signed Android Release APK (Task 31)
+- **Full Mitra App Branding:** Replaced generic "My WebView" template branding with "Mitra" as the official installed application name in `resources.arsc`.
+- **Mitra Milk-Bottle Icon:** Implemented the real Mitra milk-bottle vector logo as the adaptive icon foreground (`res/Qr.xml`) on `#183d2d` dark forest green background, and updated legacy launcher PNGs across all screen densities.
+- **Direct Production Routing:** Configured WebView settings (`assets/settings.json`) and splash screen redirects (`assets/web/index.html`) to launch directly into `https://mitra-beryl.vercel.app/` with full cookie and session persistence.
+- **Cryptographic Release Signing:** Signed with Java `jarsigner` (2048-bit RSA, SHA256withRSA) using a dedicated release keystore for instant verification on real Android devices without parse errors.
+
+---
+
 ## 🔒 Security Architecture
 
 For detailed information on database triggers, RLS policies, webhook HMAC verification, and token rotation, please read our dedicated [SECURITY.md](./SECURITY.md) document.

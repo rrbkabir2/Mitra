@@ -45,7 +45,7 @@ export default function AuthCallbackPage() {
 
     async function verifyAndRedirect(email: string) {
       const normalizedEmail = email.trim().toLowerCase();
-      let isAuthorized = normalizedEmail === 'rrbkabir2@gmail.com';
+      let isAuthorized = isEmailAllowed(normalizedEmail);
 
       if (!isAuthorized && supabase) {
         try {

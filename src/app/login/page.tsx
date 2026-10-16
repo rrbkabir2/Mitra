@@ -41,7 +41,7 @@ function LoginForm() {
 
     if (err === 'unauthorized_email') {
       setErrorMsg(
-        `Access Denied: The account ${rejectedEmail ? `"${rejectedEmail}"` : ''} is not on the pre-approved admin allow-list. Only Kabir Bundele's authorized admin account (rrbkabir2@gmail.com) can access Mitra.`
+        `Access Denied: The account ${rejectedEmail ? `"${rejectedEmail}"` : ''} is not on the pre-approved admin allow-list. Only authorized admin accounts can access Mitra.`
       );
     } else if (reason === 'timeout') {
       setErrorMsg('Session Expired: You were automatically signed out after 60 minutes of inactivity for your security.');
@@ -77,29 +77,43 @@ function LoginForm() {
 
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
-
-    if (!isSupabaseConfigured || !supabase) {
-      setShowConfigNotice(true);
-      return;
-    }
+    setIsGoogleLoading(true);
 
     try {
-      setIsGoogleLoading(true);
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'select_account',
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mitra-beryl.vercel.app';
+      
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${origin}/auth/callback`,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'select_account',
+            },
           },
-        },
-      });
+        });
 
-      if (error) {
-        setErrorMsg(`Google sign-in error: ${error.message}`);
-        setIsGoogleLoading(false);
+        if (error) {
+          setErrorMsg(`Google sign-in error: ${error.message}`);
+          setIsGoogleLoading(false);
+          return;
+        }
+
+        if (data?.url) {
+          if (typeof window !== 'undefined') {
+            window.location.href = data.url;
+            return;
+          }
+        }
+      }
+
+      // Direct fallback to Supabase Google OAuth endpoint
+      const directOAuthUrl = `https://agsqbuwufulwevqjmhab.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
+        `${origin}/auth/callback`
+      )}&prompt=select_account`;
+      if (typeof window !== 'undefined') {
+        window.location.href = directOAuthUrl;
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google sign-in error';
@@ -269,7 +283,7 @@ function LoginForm() {
               autoCapitalize="off"
               spellCheck={false}
               style={{ paddingLeft: '2.5rem' }}
-              placeholder="e.g. rrbkabir2@gmail.com"
+              placeholder="name@example.com"
             />
             <Mail
               size={16}

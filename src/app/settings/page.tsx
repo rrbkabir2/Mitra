@@ -342,7 +342,7 @@ export default function SettingsPage() {
                   id="btn-download-apk-direct"
                 >
                   <Download size={14} />
-                  <span>Download Mitra APK (version 0.2 • 7.3 MB)</span>
+                  <span>Download Mitra APK (version 0.2 • 7.1 MB Signed)</span>
                 </a>
 
                 <button
