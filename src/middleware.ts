@@ -24,6 +24,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/whatsapp/webhook') ||
     pathname.startsWith('/api/reminders/check') ||
     pathname.startsWith('/api/keep-alive') ||
+    pathname.startsWith('/downloads') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/manifest.json') ||

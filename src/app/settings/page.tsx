@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useMitra } from '@/context/MitraContext';
 import { CleanNumberInput } from '@/components/CleanNumberInput';
 import { MilkBottleIcon } from '@/components/MilkBottleIcon';
@@ -24,6 +25,9 @@ import {
   Layers,
 } from 'lucide-react';
 
+import { messagingService, MessagingChannel, ChannelConfig } from '@/lib/messaging';
+import { MessageSquare, CreditCard } from 'lucide-react';
+
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
@@ -45,6 +49,21 @@ export default function SettingsPage() {
     toggleAdvancedMode,
     pruneSettledPhotos,
   } = useMitra();
+
+  // Point 12: Messaging Channels State
+  const [enabledChannels, setEnabledChannels] = useState<MessagingChannel[]>([]);
+  const [channelConfigs, setChannelConfigs] = useState<ChannelConfig[]>([]);
+
+  useEffect(() => {
+    setEnabledChannels(messagingService.getEnabledChannels());
+    setChannelConfigs(messagingService.getChannelConfigs());
+  }, []);
+
+  const handleToggleChannel = (channel: MessagingChannel) => {
+    const isCurrentlyEnabled = enabledChannels.includes(channel);
+    messagingService.setChannelEnabled(channel, !isCurrentlyEnabled);
+    setEnabledChannels(messagingService.getEnabledChannels());
+  };
 
   const [reminderTime, setReminderTime] = useState<string>(household.daily_reminder_time || '09:00');
   const [autoConfirmHours, setAutoConfirmHours] = useState<number>(household.auto_confirm_hours || 24);
@@ -277,10 +296,10 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              <div style={{ marginTop: '0.85rem' }}>
-                <button
-                  type="button"
-                  onClick={handleInstallClick}
+              <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <a
+                  href="/downloads/mitra-v0.1.apk"
+                  download="mitra-v0.1.apk"
                   className="btn-primary"
                   style={{
                     width: '100%',
@@ -292,11 +311,32 @@ export default function SettingsPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '0.4rem',
+                    textDecoration: 'none',
+                    borderRadius: '8px',
+                  }}
+                  id="btn-download-apk-direct"
+                >
+                  <Download size={14} />
+                  <span>Download Mitra APK (v0.1)</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleInstallClick}
+                  className="btn-secondary"
+                  style={{
+                    width: '100%',
+                    fontSize: '0.78rem',
+                    padding: '0.4rem 0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
                   }}
                   id="btn-install-android"
                 >
-                  <Download size={14} />
-                  <span>{isInstalled ? 'App Already Installed' : 'Install on Android'}</span>
+                  <Smartphone size={13} />
+                  <span>{isInstalled ? 'Web App Installed' : 'Install Instant PWA'}</span>
                 </button>
               </div>
             </div>
@@ -364,6 +404,100 @@ export default function SettingsPage() {
             <div style={{ fontSize: '0.76rem', color: '#166534', lineHeight: 1.45 }}>
               <strong>Strict Zero Background Execution Policy:</strong> The installed Mitra app runs exclusively while actively open on your screen. It starts no background sync, no hidden workers, and completely stops running and releases 100% of device resources the instant it is closed.
             </div>
+          </div>
+        </section>
+
+        {/* =========================================================================
+            POINT 12: MESSAGING CHANNELS (THREE SWAPPABLE, MULTI-SELECT OPTIONS)
+            ========================================================================= */}
+        <section className="content-card" id="section-messaging-channels">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <div style={{ background: '#183d2d', color: '#ffffff', padding: '0.45rem', borderRadius: '10px', display: 'flex' }}>
+                <MessageSquare size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.12rem', fontWeight: 800 }}>Messaging Channels Configuration</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Three swappable gateways. Multi-select enabled: multiple channels can be active simultaneously.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/whatsapp-usage"
+              style={{ fontSize: '0.78rem', color: '#183d2d', fontWeight: 700, textDecoration: 'underline' }}
+            >
+              View Per-Channel Trackers &rarr;
+            </Link>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+            {channelConfigs.map((cfg) => {
+              const isEnabled = enabledChannels.includes(cfg.id);
+              return (
+                <div
+                  key={cfg.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: isEnabled ? '#f8fafc' : '#ffffff',
+                    border: `1.5px solid ${isEnabled ? '#183d2d' : '#e2e8f0'}`,
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <div style={{ flex: 1, paddingRight: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                        {cfg.name}
+                      </span>
+                      {cfg.isConfigured ? (
+                        <span style={{ fontSize: '0.68rem', background: '#dcfce7', color: '#15803d', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 700 }}>
+                          Ready & Configured
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.68rem', background: '#fef3c7', color: '#b45309', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 700 }}>
+                          Needs API Setup
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                      {cfg.description}
+                    </p>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem', fontWeight: 500 }}>
+                      Pricing/Allowance: {cfg.costDescription}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleChannel(cfg.id)}
+                    style={{ color: isEnabled ? '#183d2d' : '#94a3b8' }}
+                    id={`toggle-channel-${cfg.id}`}
+                    aria-label={`Toggle ${cfg.name}`}
+                  >
+                    {isEnabled ? <ToggleRight size={38} color="#183d2d" /> : <ToggleLeft size={38} />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div
+            style={{
+              marginTop: '1rem',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.75rem',
+              fontSize: '0.76rem',
+              color: 'var(--text-muted)',
+              lineHeight: 1.45,
+            }}
+          >
+            💡 <strong>Multi-Channel Dispatch Behavior:</strong> When you record a delivery entry, Mitra simultaneously sends through every channel toggled ON above. If the Personal Phone channel is active, Mitra prepares the formatted message & image and gives you a 1-tap send prompt so no typing is required.
           </div>
         </section>
 

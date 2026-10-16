@@ -411,20 +411,81 @@ class MitraStore {
     this.notify();
   }
 
+  private deletedDates: string[] = [];
+
   public addEntry(entryData: Omit<Entry, 'id' | 'created_at' | 'status_set_by' | 'status_set_at'>): Entry {
+    const isReplacement = this.deletedDates.includes(`${entryData.entry_date}_${entryData.vendor_id}`);
     const newEntry: Entry = {
       ...entryData,
       id: `entry_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       status_set_by: null,
       status_set_at: null,
+      is_corrected: Boolean(isReplacement || entryData.is_corrected),
       created_at: new Date().toISOString(),
     };
 
     // Prepend to entries
     this.entries.unshift(newEntry);
     this.monthlyMessageCount += 1;
+    this.saveToStorage();
     this.notify();
     return newEntry;
+  }
+
+  public editEntry(entryId: string, updates: Partial<Entry>, reason?: string): Entry {
+    const index = this.entries.findIndex((e) => e.id === entryId);
+    if (index === -1) {
+      throw new Error(`Entry ${entryId} not found`);
+    }
+
+    const oldEntry = this.entries[index];
+    const previous_values: Record<string, unknown> = {};
+    if (updates.quantity !== undefined && updates.quantity !== oldEntry.quantity) {
+      previous_values.quantity = oldEntry.quantity;
+    }
+    if (updates.unit_price !== undefined && updates.unit_price !== oldEntry.unit_price) {
+      previous_values.unit_price = oldEntry.unit_price;
+    }
+    if (updates.total_price !== undefined && updates.total_price !== oldEntry.total_price) {
+      previous_values.total_price = oldEntry.total_price;
+    }
+    if (updates.product_id !== undefined && updates.product_id !== oldEntry.product_id) {
+      previous_values.product_id = oldEntry.product_id;
+    }
+
+    const editRecord = {
+      edited_at: new Date().toISOString(),
+      previous_values,
+      note: reason || 'Correction made by admin',
+    };
+
+    const updatedEntry: Entry = {
+      ...oldEntry,
+      ...updates,
+      is_corrected: true,
+      edit_history: [...(oldEntry.edit_history || []), editRecord],
+    };
+
+    this.entries[index] = updatedEntry;
+    this.saveToStorage();
+    this.notify();
+    return updatedEntry;
+  }
+
+  public deleteEntry(entryId: string): boolean {
+    const index = this.entries.findIndex((e) => e.id === entryId);
+    if (index === -1) return false;
+
+    const entry = this.entries[index];
+    const key = `${entry.entry_date}_${entry.vendor_id}`;
+    if (!this.deletedDates.includes(key)) {
+      this.deletedDates.push(key);
+    }
+
+    this.entries.splice(index, 1);
+    this.saveToStorage();
+    this.notify();
+    return true;
   }
 
   /**

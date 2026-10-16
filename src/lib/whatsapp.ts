@@ -96,50 +96,40 @@ export async function sendWhatsAppDeliveryMessage(params: {
   const bodyText =
     `🥛 *Mitra Delivery Confirmation*\n` +
     `Namaste ${vendorName} ji,\n\n` +
-    `Today's entry has been recorded:\n` +
+    `Today's delivery entry has been recorded:\n` +
     `📅 *Date:* ${date} (${time})\n` +
     `🥛 *Item:* ${milkType} Milk\n` +
     `⚖️ *Quantity:* ${quantity} Litres @ ₹${unitPrice}/L\n` +
     (extraItemsText ? `📦 *Extra Items:*${extraItemsText}\n` : '') +
     `💰 *Total Amount:* ₹${totalPrice}\n` +
-    (photoUrl ? `📸 *Photo Proof:* ${proofUrl}\n` : '') +
-    `\n🔒 *Tamper-Proof Record:* Please tap Approve or Deny below. If no dispute within 24h, this entry will auto-confirm.\n` +
-    `\n🌐 Or confirm on web: ${portalUrl}`;
+    `\n🔒 *Permanent Record:* This record is permanent, transparent, and tamper-proof. If there is any discrepancy in quantity or rate, please call Kabir Bundele directly.\n` +
+    `\n🌐 View permanent delivery details & photo: ${portalUrl}`;
 
   // If live WhatsApp credentials exist, execute the real HTTP call to Meta
   if (isWhatsAppLiveConfigured) {
     try {
-      // Build interactive button payload
-      const payload: Record<string, unknown> = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: vendorPhone.replace(/[^0-9]/g, ''),
-        type: 'interactive',
-        interactive: {
-          type: 'button',
-          header: photoUrl ? { type: 'image', image: { link: photoUrl } } : { type: 'text', text: 'Mitra Delivery Record' },
-          body: { text: bodyText },
-          footer: { text: 'Mitra • Permanent Household Ledger' },
-          action: {
-            buttons: [
-              {
-                type: 'reply',
-                reply: {
-                  id: `APPROVE_${entryId}`,
-                  title: 'Approve (स्वीकृत)',
-                },
-              },
-              {
-                type: 'reply',
-                reply: {
-                  id: `DENY_${entryId}`,
-                  title: 'Deny (अस्वीकृत)',
-                },
-              },
-            ],
-          },
-        },
-      };
+      // Standard message payload without interactive buttons
+      const payload: Record<string, unknown> = photoUrl
+        ? {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: vendorPhone.replace(/[^0-9]/g, ''),
+            type: 'image',
+            image: {
+              link: photoUrl,
+              caption: bodyText,
+            },
+          }
+        : {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: vendorPhone.replace(/[^0-9]/g, ''),
+            type: 'text',
+            text: {
+              preview_url: true,
+              body: bodyText,
+            },
+          };
 
       const res = await fetch(
         `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`,

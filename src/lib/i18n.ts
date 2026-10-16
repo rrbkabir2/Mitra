@@ -57,9 +57,9 @@ export const translations = {
     },
     safeguard: {
       title: 'Trust Safeguard Active',
-      adminReadOnlyBadge: 'Tamper-Proof Guarantee',
-      notice: 'Admins cannot mark deliveries as Confirmed or Denied. Confirmation rights belong exclusively to the vendor via WhatsApp. If the vendor does not dispute within 24h, the system auto-confirms with an auditable tag.',
-      adminNoticeShort: 'Admins cannot confirm/deny deliveries. Only vendor can confirm.',
+      adminReadOnlyBadge: 'Tamper-Proof Ledger',
+      notice: 'Every delivery entry logged is recorded as a transparent, permanent, and tamper-proof joint record. Vendors receive a read-only confirmation link with photos and details. Any delivery disputes are resolved by calling Kabir Bundele directly.',
+      adminNoticeShort: 'Permanent, transparent & tamper-proof record. Disputes resolved via direct phone call.',
     },
     history: {
       title: 'Delivery History',
@@ -281,10 +281,10 @@ export const translations = {
       absentSubmit: 'अनुपस्थित की पुष्टि करें',
     },
     safeguard: {
-      title: 'विश्वास सुरक्षा तंत्र सक्रिय',
-      adminReadOnlyBadge: 'छेड़छाड़-मुक्त गारंटी',
-      notice: 'एडमिन डिलीवरी को स्वीकृत या अस्वीकृत नहीं कर सकता। पुष्टि का अधिकार केवल विक्रेता के पास व्हाट्सएप के माध्यम से है। यदि विक्रेता 24 घंटे में कोई विवाद नहीं करता, तो सिस्टम स्वतः पुष्ट कर देता है।',
-      adminNoticeShort: 'एडमिन डिलीवरी की पुष्टि नहीं कर सकता। केवल विक्रेता ही पुष्टि कर सकता है।',
+      title: 'पारदर्शी सुरक्षा तंत्र सक्रिय',
+      adminReadOnlyBadge: 'अपरिवर्तनीय खाता',
+      notice: 'प्रत्येक दर्ज डिलीवरी रिकॉर्ड पारदर्शी, स्थायी और छेड़छाड़-मुक्त रहता है। विक्रेता को फोटो और विवरण के साथ केवल-पठन लिंक मिलता है। किसी भी विवाद का समाधान सीधे कबीर बुंदेले को फोन करके किया जाता है।',
+      adminNoticeShort: 'स्थायी और छेड़छाड़-मुक्त रिकॉर्ड। किसी भी विवाद पर सीधे फोन पर बात करें।',
     },
     history: {
       title: 'डिलीवरी इतिहास',
@@ -506,10 +506,10 @@ export const translations = {
       absentSubmit: 'अनुपस्थितीची खात्री करा',
     },
     safeguard: {
-      title: 'विश्वास सुरक्षा कवच सक्रिय',
-      adminReadOnlyBadge: 'छेडछाड-मुक्त हमी',
-      notice: 'घरमालक डिलिव्हरी स्वीकृत किंवा नाकारू शकत नाही. पुष्टीचा अधिकार फक्त विक्रेत्याकडे व्हॉट्सॲपद्वारे आहे. २४ तासांत वाद न झाल्यास सिस्टीम आपोआप पुष्टी करते.',
-      adminNoticeShort: 'अ‍ॅडमिन पुष्टी करू शकत नाही. फक्त विक्रेता पुष्टी करू शकतो.',
+      title: 'पारदर्शक सुरक्षा कवच सक्रिय',
+      adminReadOnlyBadge: 'छेडछाड-मुक्त नोंदवही',
+      notice: 'प्रत्येक नोंदवलेली डिलिव्हरी पारदर्शक, कायमस्वरूपी आणि छेडछाड-मुक्त संयुक्त नोंद म्हणून ठेवली जाते. विक्रेत्याला फोटो आणि तपशीलांसह केवळ-वाचन लिंक दिली जाते. कोणतेही मतभेद असल्यास थेट कबीर बुंदेले यांना फोन करून सोडवले जातात.',
+      adminNoticeShort: 'कायमस्वरूपी आणि छेडछाड-मुक्त नोंद. कोणत्याही शंकेसाठी थेट फोनवर संपर्क साधा.',
     },
     history: {
       title: 'डिलिव्हरी इतिहास',

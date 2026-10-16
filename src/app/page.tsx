@@ -8,7 +8,7 @@ import { MilkBottleIcon } from '@/components/MilkBottleIcon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { compressImage } from '@/lib/imageCompression';
 import { sendWhatsAppDeliveryMessage, sendWhatsAppAbsentAlert } from '@/lib/whatsapp';
-import { MilkSubtype, ExtraItem, UnitType } from '@/types';
+import { MilkSubtype, ExtraItem, UnitType, Entry } from '@/types';
 import { CleanNumberInput } from '@/components/CleanNumberInput';
 import {
   Camera,
@@ -32,6 +32,9 @@ import {
   ExternalLink,
   Calendar as CalendarIcon,
   Filter,
+  Edit3,
+  Share2,
+  ShieldCheck,
 } from 'lucide-react';
 
 export default function TodayPage() {
@@ -44,6 +47,8 @@ export default function TodayPage() {
     isAdminLoggedIn,
     isLoadingAuth,
     addDeliveryEntry,
+    editDeliveryEntry,
+    deleteDeliveryEntry,
     markTodayAbsent,
     addPurchase,
     addProduct,
@@ -72,6 +77,15 @@ export default function TodayPage() {
   const [filterMonth, setFilterMonth] = useState<string>(currentMonthStr);
   const [filterYear, setFilterYear] = useState<string>(currentYearStr);
 
+  // Detail & Edit Modal State (Matching History Page)
+  const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editUnitPrice, setEditUnitPrice] = useState<number>(60);
+  const [editReason, setEditReason] = useState<string>('');
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [copiedProofLink, setCopiedProofLink] = useState<boolean>(false);
+
   // Quick Entry Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
@@ -81,6 +95,88 @@ export default function TodayPage() {
     message: string;
     details: string;
   } | null>(null);
+
+  const getVendorName = (vendorId: string) => {
+    return vendors.find((v) => v.id === vendorId)?.name || 'Dairy Vendor';
+  };
+
+  const getVendorToken = (vendorId: string) => {
+    return vendors.find((v) => v.id === vendorId)?.access_token || '';
+  };
+
+  const startEditEntry = (entry: Entry) => {
+    setSelectedEntry(entry);
+    setEditQuantity(entry.quantity);
+    setEditUnitPrice(entry.unit_price);
+    setEditReason('');
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEntry) return;
+    setIsSavingEdit(true);
+
+    try {
+      const updatedTotal = parseFloat((editQuantity * editUnitPrice).toFixed(2));
+      const updated = await editDeliveryEntry(
+        selectedEntry.id,
+        {
+          quantity: editQuantity,
+          unit_price: editUnitPrice,
+          total_price: updatedTotal,
+        },
+        editReason || 'Quantity/rate corrected by admin'
+      );
+      setSelectedEntry(updated);
+      setIsEditing(false);
+      setSuccessToast({
+        show: true,
+        message: 'Entry corrected successfully!',
+        details: `Re-notification automatically dispatched to ${getVendorName(selectedEntry.vendor_id)} across active channels.`,
+      });
+      setTimeout(() => setSuccessToast(null), 5000);
+    } catch (err: unknown) {
+      alert(`Edit error: ${err instanceof Error ? err.message : 'Failed to update'}`);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteEntry = async () => {
+    if (!selectedEntry) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete the delivery entry for ${selectedEntry.entry_date}?\n\nNote: Any replacement entry created for this date will be transparently flagged as a "Corrected Entry" to prevent vendor confusion.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteDeliveryEntry(selectedEntry.id);
+      setSelectedEntry(null);
+      setIsEditing(false);
+      setSuccessToast({
+        show: true,
+        message: 'Entry deleted.',
+        details: 'Any replacement entry logged for today will be transparently marked as a Corrected Entry.',
+      });
+      setTimeout(() => setSuccessToast(null), 5000);
+    } catch (err: unknown) {
+      alert(`Delete error: ${err instanceof Error ? err.message : 'Failed to delete'}`);
+    }
+  };
+
+  const handleCopyProofLink = (entry: Entry) => {
+    const token = getVendorToken(entry.vendor_id);
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const proofUrl = `${origin}/v/${token}/proof/${entry.id}`;
+
+    navigator.clipboard.writeText(proofUrl);
+    setCopiedProofLink(true);
+    setTimeout(() => setCopiedProofLink(false), 3000);
+  };
 
   // Form Fields
   const [entryQuantity, setEntryQuantity] = useState<number>(1.0);
@@ -1085,15 +1181,39 @@ export default function TodayPage() {
             No delivery records found for this selected filter period.
           </div>
         ) : (
-          <div className="ledger-list">
+          <div className="ledger-list" role="feed" aria-label="Deliveries Ledger">
             {filteredEntries.map((entry) => (
-              <div key={entry.id} className="ledger-row-card">
+              <div
+                key={entry.id}
+                className="ledger-row-card"
+                onClick={() => setSelectedEntry(entry)}
+                role="button"
+                tabIndex={0}
+                style={{ cursor: 'pointer' }}
+                id={`today-entry-${entry.id}`}
+              >
                 <div className="ledger-row-top">
                   <span className="ledger-date">
                     <Clock size={14} color="#64748b" />
                     {entry.entry_date} at {entry.entry_time}
                   </span>
-                  <StatusBadge status={entry.status} statusSetBy={entry.status_set_by} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {entry.is_corrected && (
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          background: '#e0f2fe',
+                          color: '#0369a1',
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: 4,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Corrected
+                      </span>
+                    )}
+                    <StatusBadge status={entry.status} statusSetBy={entry.status_set_by} />
+                  </div>
                 </div>
                 <div className="ledger-details">
                   <span className="ledger-items">
@@ -1105,6 +1225,9 @@ export default function TodayPage() {
                         {entry.extra_items?.length > 0 && ` + ${entry.extra_items.length} items`}
                       </>
                     )}
+                    <span style={{ marginLeft: '8px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                      &bull; {getVendorName(entry.vendor_id)}
+                    </span>
                   </span>
                   <span className="ledger-amount">₹{entry.total_price}</span>
                 </div>
@@ -1113,6 +1236,31 @@ export default function TodayPage() {
                     Note: {entry.notes}
                   </p>
                 )}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: '0.4rem',
+                    borderTop: '1px dashed var(--border-glass)',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-muted)',
+                    marginTop: '0.35rem',
+                  }}
+                >
+                  <span>
+                    {entry.photo_url ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#183d2d', fontWeight: 600 }}>
+                        <Camera size={12} /> Photo attached
+                      </span>
+                    ) : (
+                      'No photo'
+                    )}
+                  </span>
+                  <span style={{ color: '#183d2d', fontWeight: 600 }}>
+                    Tap for details, edit or delete &rarr;
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -1636,6 +1784,355 @@ export default function TodayPage() {
               >
                 {t.today.absentSubmit}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DETAIL MODAL WITH AUDIT TRAIL, INLINE EDIT, DELETE & SHAREABLE TOKEN LINK */}
+      {selectedEntry && (
+        <div className="modal-backdrop" onClick={() => { setSelectedEntry(null); setIsEditing(false); }}>
+          <div
+            className="modal-sheet"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="modal-header">
+              <h3>{isEditing ? 'Correct Delivery Entry' : t.history.detailTitle}</h3>
+              <button
+                className="modal-close-btn"
+                onClick={() => { setSelectedEntry(null); setIsEditing(false); }}
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '1rem',
+                }}
+              >
+                <div>
+                  <h4 style={{ fontSize: '1.15rem', fontWeight: 800 }}>
+                    {selectedEntry.entry_date} ({selectedEntry.entry_time})
+                  </h4>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    Vendor: <strong>{getVendorName(selectedEntry.vendor_id)}</strong>
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {selectedEntry.is_corrected && (
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        background: '#e0f2fe',
+                        color: '#0369a1',
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: 4,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Corrected
+                    </span>
+                  )}
+                  <StatusBadge status={selectedEntry.status} statusSetBy={selectedEntry.status_set_by} />
+                </div>
+              </div>
+
+              {/* Read-Only Status & Safeguard Notice */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.75rem',
+                  marginBottom: '1rem',
+                  fontSize: '0.78rem',
+                  color: '#475569',
+                }}
+              >
+                <strong>{t.safeguard.adminReadOnlyBadge}:</strong> The delivery status above is strictly
+                read-only for admins. Confirmation was executed by{' '}
+                <strong>
+                  {selectedEntry.status === 'auto-confirmed' || selectedEntry.status_set_by === 'system_auto'
+                    ? '24h System Auto-Confirmation (Auditable Proof: auto-confirmed)'
+                    : selectedEntry.status_set_by === 'vendor'
+                    ? 'Vendor on WhatsApp (Auditable Proof: confirmed)'
+                    : 'Pending Vendor Response'}
+                </strong>.
+              </div>
+
+              {/* Items Breakdown */}
+              <div
+                style={{
+                  background: 'var(--bg-main)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem',
+                  marginBottom: '1rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', fontSize: '0.88rem' }}>
+                  <span>Milk Quantity:</span>
+                  <strong>{selectedEntry.quantity} Litres</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', fontSize: '0.88rem' }}>
+                  <span>Unit Rate:</span>
+                  <strong>₹{selectedEntry.unit_price} / Litre</strong>
+                </div>
+
+                {selectedEntry.extra_items?.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.84rem',
+                      color: 'var(--text-secondary)',
+                      paddingTop: '0.25rem',
+                    }}
+                  >
+                    <span>{item.name} ({item.quantity} {item.unit}):</span>
+                    <span>₹{item.price}</span>
+                  </div>
+                ))}
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '0.5rem',
+                    paddingTop: '0.5rem',
+                    borderTop: '1px solid var(--border-glass)',
+                    fontSize: '1rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  <span>{t.today.totalPrice}:</span>
+                  <span style={{ color: '#183d2d' }}>₹{selectedEntry.total_price}</span>
+                </div>
+              </div>
+
+              {/* Delivery Photo */}
+              {selectedEntry.photo_url && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Delivery Photo Proof:</label>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={selectedEntry.photo_url}
+                    alt="Delivery proof"
+                    style={{
+                      width: '100%',
+                      maxHeight: '240px',
+                      objectFit: 'cover',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-glass)',
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Notes */}
+              {selectedEntry.notes && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">{t.today.notes}:</label>
+                  <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
+                    {selectedEntry.notes}
+                  </p>
+                </div>
+              )}
+
+              {/* Point 17: Visible Audit History & Correction Trail */}
+              {selectedEntry.is_corrected && (
+                <div
+                  style={{
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.75rem',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, fontSize: '0.82rem', color: '#0369a1', marginBottom: '0.35rem' }}>
+                    <ShieldCheck size={16} />
+                    <span>Transparent Audit Trail (Corrected Entry)</span>
+                  </div>
+                  <p style={{ fontSize: '0.76rem', color: '#0284c7', lineHeight: 1.4 }}>
+                    This entry was transparently corrected by the household administrator. Changes are recorded below to preserve the tamper-proof ledger.
+                  </p>
+
+                  {selectedEntry.edit_history && selectedEntry.edit_history.length > 0 && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {selectedEntry.edit_history.map((hist, idx) => (
+                        <div key={idx} style={{ fontSize: '0.74rem', background: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #e0f2fe' }}>
+                          <span style={{ fontWeight: 600, color: '#0369a1' }}>
+                            {new Date(hist.edited_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })},{' '}
+                            {new Date(hist.edited_at).toLocaleDateString()}:
+                          </span>{' '}
+                          <span style={{ color: 'var(--text-secondary)' }}>{hist.note || 'Entry details adjusted'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Point 17: Inline Edit Form if Editing Mode is Active */}
+              {isEditing ? (
+                <form
+                  onSubmit={handleSaveEdit}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #0284c7',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0369a1', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Edit3 size={16} />
+                    <span>Correct Delivery Details</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>Quantity (Litres)</label>
+                      <CleanNumberInput
+                        min={0.25}
+                        step="0.25"
+                        value={editQuantity}
+                        onChange={(val) => setEditQuantity(val || 1)}
+                        className="form-input"
+                        required
+                        id="input-today-edit-quantity"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>Unit Price (₹/L)</label>
+                      <CleanNumberInput
+                        min={0}
+                        step="1"
+                        value={editUnitPrice}
+                        onChange={(val) => setEditUnitPrice(val || 60)}
+                        className="form-input"
+                        required
+                        id="input-today-edit-price"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Correction Reason / Note (Sent to Vendor)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Corrected mistaken quantity"
+                      value={editReason}
+                      onChange={(e) => setEditReason(e.target.value)}
+                      className="form-input"
+                      style={{ fontSize: '0.82rem' }}
+                      id="input-today-edit-reason"
+                    />
+                  </div>
+
+                  <div style={{ fontSize: '0.75rem', color: '#0369a1', marginBottom: '0.85rem', lineHeight: 1.4 }}>
+                    ℹ️ <strong>Vendor Re-Notification:</strong> Saving this correction will automatically dispatch an updated message to {getVendorName(selectedEntry.vendor_id)} across all active channels.
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="btn-secondary"
+                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingEdit}
+                      className="btn-primary"
+                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem', background: '#0284c7', borderColor: '#0284c7' }}
+                      id="btn-today-save-correction"
+                    >
+                      {isSavingEdit ? 'Saving & Notifying...' : 'Save & Re-Notify Vendor'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* Action Row: Edit & Delete Buttons */
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => startEditEntry(selectedEntry)}
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: '#0369a1', borderColor: '#bae6fd' }}
+                    id="btn-today-modal-edit"
+                  >
+                    <Edit3 size={15} />
+                    <span>Edit Entry</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteEntry}
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: '#dc2626', borderColor: '#fecaca' }}
+                    id="btn-today-modal-delete"
+                  >
+                    <Trash2 size={15} />
+                    <span>Delete Entry</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Shareable Token Proof Certificate Link */}
+              <div
+                style={{
+                  background: '#f1f5f9',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {t.history.shareLink}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Token-authorized public verification certificate
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyProofLink(selectedEntry)}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem' }}
+                  >
+                    {copiedProofLink ? <Check size={14} color="#059669" /> : <Share2 size={14} />}
+                    <span>{copiedProofLink ? 'Copied' : 'Share'}</span>
+                  </button>
+
+                  <Link
+                    href={`/v/${getVendorToken(selectedEntry.vendor_id)}/proof/${selectedEntry.id}`}
+                    target="_blank"
+                    className="btn-primary"
+                    style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem', background: '#183d2d', borderColor: '#183d2d' }}
+                  >
+                    <ExternalLink size={14} />
+                    <span>View</span>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>

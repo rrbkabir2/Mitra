@@ -17,6 +17,8 @@ import { mitraStore } from '@/lib/store';
 import { translations, TranslationKeys } from '@/lib/i18n';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { isEmailAllowed, setClientAuthCookie, clearClientAuthCookie, getClientAuthCookie } from '@/lib/auth';
+import { mirrorToMongoApi } from '@/lib/backupClient';
+import { messagingService } from '@/lib/messaging';
 
 interface MitraContextType {
   household: Household;
@@ -36,6 +38,8 @@ interface MitraContextType {
   loginAdmin: (email: string, pass: string) => Promise<boolean>;
   logoutAdmin: () => Promise<void>;
   addDeliveryEntry: (entry: Omit<Entry, 'id' | 'created_at' | 'status_set_by' | 'status_set_at'>) => Promise<Entry>;
+  editDeliveryEntry: (entryId: string, updates: Partial<Entry>, reason?: string) => Promise<Entry>;
+  deleteDeliveryEntry: (entryId: string) => Promise<boolean>;
   markTodayAbsent: (notes?: string) => Promise<Entry>;
   requestPriceChange: (productId: string, newPrice: number) => Promise<PriceChangeRequest>;
   resolvePriceChange: (requestId: string, status: 'approved' | 'denied') => Promise<boolean>;
@@ -325,7 +329,81 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // Point 18: Mirror write to secondary MongoDB backup
+    mirrorToMongoApi('entries', 'insert', entry.id, entry as unknown as Record<string, unknown>);
+
     return entry;
+  };
+
+  // Point 17: Edit delivery entry with audit history & vendor re-notification
+  const editDeliveryEntry = async (
+    entryId: string,
+    updates: Partial<Entry>,
+    reason?: string
+  ): Promise<Entry> => {
+    const updated = mitraStore.editEntry(entryId, updates, reason);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('entries')
+          .update({
+            ...updates,
+            notes: (updates.notes ? updates.notes + ' | ' : '') + `Corrected: ${reason || 'Details updated'}`,
+          })
+          .eq('id', entryId);
+      } catch (err) {
+        console.error('Supabase update entry error:', err);
+      }
+    }
+
+    // Point 18: Mirror update to secondary MongoDB cluster
+    mirrorToMongoApi('entries', 'update', entryId, updated as unknown as Record<string, unknown>);
+
+    // Point 17: Vendor Re-Notification across all active channels
+    const targetVendor = vendors.find((v) => v.id === updated.vendor_id);
+    const targetProduct = products.find((p) => p.id === updated.product_id);
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+
+    if (targetVendor) {
+      messagingService.dispatchDelivery({
+        vendorPhone: targetVendor.phone_number,
+        vendorName: targetVendor.name,
+        vendorToken: targetVendor.access_token,
+        entryId: updated.id,
+        date: updated.entry_date,
+        time: updated.entry_time,
+        milkType: targetProduct?.name || 'Milk',
+        quantity: updated.quantity,
+        unitPrice: updated.unit_price,
+        totalPrice: updated.total_price,
+        extraItems: updated.extra_items,
+        photoUrl: updated.photo_url,
+        appUrl: origin,
+        isCorrection: true,
+        correctionDetails: reason || `Updated to ${updated.quantity}L @ ₹${updated.unit_price}/L (Total ₹${updated.total_price})`,
+      }).catch((e) => console.error('Correction notification dispatch error:', e));
+    }
+
+    return updated;
+  };
+
+  // Point 17: Delete entry from primary database and local store
+  const deleteDeliveryEntry = async (entryId: string): Promise<boolean> => {
+    const ok = mitraStore.deleteEntry(entryId);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('entries').delete().eq('id', entryId);
+      } catch (err) {
+        console.error('Supabase delete entry error:', err);
+      }
+    }
+
+    // Point 18: Mirror deletion to secondary MongoDB cluster
+    mirrorToMongoApi('entries', 'delete', entryId, { id: entryId });
+
+    return ok;
   };
 
   const markTodayAbsent = async (notes?: string): Promise<Entry> => {
@@ -604,6 +682,8 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
         loginAdmin,
         logoutAdmin,
         addDeliveryEntry,
+        editDeliveryEntry,
+        deleteDeliveryEntry,
         markTodayAbsent,
         requestPriceChange,
         resolvePriceChange,

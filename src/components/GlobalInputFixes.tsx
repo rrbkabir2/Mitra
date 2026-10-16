@@ -9,18 +9,12 @@ import { useEffect } from 'react';
  */
 export function GlobalInputFixes() {
   useEffect(() => {
-    // 1. Disable wheel increment/decrement on number inputs
+    // 1. Disable wheel increment/decrement on all number inputs globally
     const handleWheel = (e: WheelEvent) => {
-      const active = document.activeElement;
       const target = e.target;
-
-      if (
-        (active instanceof HTMLInputElement && active.type === 'number') ||
-        (target instanceof HTMLInputElement && target.type === 'number')
-      ) {
-        if (active instanceof HTMLInputElement && active.type === 'number') {
-          active.blur();
-        }
+      if (target instanceof HTMLInputElement && target.type === 'number') {
+        // Prevent mouse wheel from changing input value
+        target.blur();
       }
     };
 
@@ -28,7 +22,6 @@ export function GlobalInputFixes() {
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target;
       if (target instanceof HTMLInputElement && target.type === 'number') {
-        // Auto-select all text on focus
         setTimeout(() => {
           if (document.activeElement === target) {
             target.select();
@@ -37,14 +30,13 @@ export function GlobalInputFixes() {
       }
     };
 
-    // 3. Prevent stuck leading zero when typing (e.g. "05" -> "5")
+    // 3. Prevent stuck leading zero when typing (e.g. "05" -> "5", except decimals "0.5")
     const handleInput = (e: Event) => {
       const target = e.target;
       if (target instanceof HTMLInputElement && target.type === 'number') {
         const val = target.value;
-        // If value starts with '0' followed by non-decimal digits, strip leading zero
-        if (/^0[1-9]/.test(val)) {
-          target.value = val.replace(/^0+/, '');
+        if (/^0[0-9]/.test(val) && !val.startsWith('0.')) {
+          target.value = val.replace(/^0+/, '') || '0';
           target.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }

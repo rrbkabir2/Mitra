@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { Entry, EntryStatus } from '@/types';
 import { useMitra } from '@/context/MitraContext';
 import { TrustSafeguardBanner } from '@/components/TrustSafeguardBanner';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Entry, EntryStatus } from '@/types';
+import { CleanNumberInput } from '@/components/CleanNumberInput';
 import {
   History,
   Calendar,
@@ -22,10 +23,14 @@ import {
   Sliders,
   Filter,
   IndianRupee,
+  Edit3,
+  Trash2,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function HistoryPage() {
-  const { t, entries, vendors, products } = useMitra();
+  const { t, entries, vendors, products, editDeliveryEntry, deleteDeliveryEntry } = useMitra();
 
   // Point 6: Identical Delivery History Filter Pattern as Homepage
   const now = new Date();
@@ -40,6 +45,70 @@ export default function HistoryPage() {
   const [dateSearch, setDateSearch] = useState<string>('');
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Point 17: Edit & Delete State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editUnitPrice, setEditUnitPrice] = useState<number>(60);
+  const [editReason, setEditReason] = useState<string>('');
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [actionToast, setActionToast] = useState<string | null>(null);
+
+  const startEditEntry = (entry: Entry) => {
+    setSelectedEntry(entry);
+    setEditQuantity(entry.quantity);
+    setEditUnitPrice(entry.unit_price);
+    setEditReason('');
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEntry) return;
+    setIsSavingEdit(true);
+
+    try {
+      const updatedTotal = parseFloat((editQuantity * editUnitPrice).toFixed(2));
+      const updated = await editDeliveryEntry(
+        selectedEntry.id,
+        {
+          quantity: editQuantity,
+          unit_price: editUnitPrice,
+          total_price: updatedTotal,
+        },
+        editReason || 'Quantity/rate corrected by admin'
+      );
+      setSelectedEntry(updated);
+      setIsEditing(false);
+      setActionToast('Entry corrected successfully! Re-notification dispatched to vendor.');
+      setTimeout(() => setActionToast(null), 5000);
+    } catch (err: unknown) {
+      alert(`Edit error: ${err instanceof Error ? err.message : 'Failed to update'}`);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteEntry = async () => {
+    if (!selectedEntry) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete the delivery entry for ${selectedEntry.entry_date}?\n\nNote: Any replacement entry created for this date will be transparently flagged as a "Corrected Entry" to prevent vendor confusion.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteDeliveryEntry(selectedEntry.id);
+      setSelectedEntry(null);
+      setIsEditing(false);
+      setActionToast('Entry deleted. Any replacement entry logged for today will be marked as a Corrected Entry.');
+      setTimeout(() => setActionToast(null), 5000);
+    } catch (err: unknown) {
+      alert(`Delete error: ${err instanceof Error ? err.message : 'Failed to delete'}`);
+    }
+  };
 
   // Filter entries based on the unified filter pattern
   const filteredEntries = entries.filter((entry) => {
@@ -99,6 +168,39 @@ export default function HistoryPage() {
 
   return (
     <main className="main-content" id="history-main-page">
+      {/* Action Toast Notification */}
+      {actionToast && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '80px',
+            right: '20px',
+            zIndex: 1000,
+            background: '#ffffff',
+            border: '1.5px solid #0284c7',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1rem 1.25rem',
+            boxShadow: 'var(--shadow-xl)',
+            maxWidth: '420px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.75rem',
+            animation: 'slideUp 0.3s ease-out',
+          }}
+          role="alert"
+        >
+          <CheckCircle size={20} color="#0284c7" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <p style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: 600 }}>{actionToast}</p>
+          <button
+            onClick={() => setActionToast(null)}
+            style={{ marginLeft: 'auto', color: '#9ca3af', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            aria-label="Close Toast"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Trust Safeguard Notice */}
       <TrustSafeguardBanner />
 
@@ -508,6 +610,149 @@ export default function HistoryPage() {
                   <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', background: 'var(--bg-main)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
                     {selectedEntry.notes}
                   </p>
+                </div>
+              )}
+
+              {/* Point 17: Visible Audit History & Correction Trail */}
+              {selectedEntry.is_corrected && (
+                <div
+                  style={{
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.75rem',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, fontSize: '0.82rem', color: '#0369a1', marginBottom: '0.35rem' }}>
+                    <ShieldCheck size={16} />
+                    <span>Transparent Audit Trail (Corrected Entry)</span>
+                  </div>
+                  <p style={{ fontSize: '0.76rem', color: '#0284c7', lineHeight: 1.4 }}>
+                    This entry was transparently corrected by the household administrator. Changes are recorded below to preserve the tamper-proof ledger.
+                  </p>
+
+                  {selectedEntry.edit_history && selectedEntry.edit_history.length > 0 && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {selectedEntry.edit_history.map((hist, idx) => (
+                        <div key={idx} style={{ fontSize: '0.74rem', background: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #e0f2fe' }}>
+                          <span style={{ fontWeight: 600, color: '#0369a1' }}>
+                            {new Date(hist.edited_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })},{' '}
+                            {new Date(hist.edited_at).toLocaleDateString()}:
+                          </span>{' '}
+                          <span style={{ color: 'var(--text-secondary)' }}>{hist.note || 'Entry details adjusted'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Point 17: Inline Edit Form if Editing Mode is Active */}
+              {isEditing ? (
+                <form
+                  onSubmit={handleSaveEdit}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #0284c7',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0369a1', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Edit3 size={16} />
+                    <span>Correct Delivery Details</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>Quantity (Litres)</label>
+                      <CleanNumberInput
+                        min={0.25}
+                        step="0.25"
+                        value={editQuantity}
+                        onChange={(val) => setEditQuantity(val || 1)}
+                        className="form-input"
+                        required
+                        id="input-edit-quantity"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>Unit Price (₹/L)</label>
+                      <CleanNumberInput
+                        min={0}
+                        step="1"
+                        value={editUnitPrice}
+                        onChange={(val) => setEditUnitPrice(val || 60)}
+                        className="form-input"
+                        required
+                        id="input-edit-price"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>Correction Reason / Note (Sent to Vendor)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Corrected mistaken quantity from yesterday"
+                      value={editReason}
+                      onChange={(e) => setEditReason(e.target.value)}
+                      className="form-input"
+                      style={{ fontSize: '0.82rem' }}
+                      id="input-edit-reason"
+                    />
+                  </div>
+
+                  <div style={{ fontSize: '0.75rem', color: '#0369a1', marginBottom: '0.85rem', lineHeight: 1.4 }}>
+                    ℹ️ <strong>Vendor Re-Notification:</strong> Saving this correction will automatically dispatch an updated message to {getVendorName(selectedEntry.vendor_id)} across all active channels.
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="btn-secondary"
+                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingEdit}
+                      className="btn-primary"
+                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem', background: '#0284c7', borderColor: '#0284c7' }}
+                      id="btn-save-correction"
+                    >
+                      {isSavingEdit ? 'Saving & Notifying...' : 'Save & Re-Notify Vendor'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* Action Row: Edit & Delete Buttons */
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => startEditEntry(selectedEntry)}
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: '#0369a1', borderColor: '#bae6fd' }}
+                    id="btn-modal-edit"
+                  >
+                    <Edit3 size={15} />
+                    <span>Edit Entry</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteEntry}
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: '#dc2626', borderColor: '#fecaca' }}
+                    id="btn-modal-delete"
+                  >
+                    <Trash2 size={15} />
+                    <span>Delete Entry</span>
+                  </button>
                 </div>
               )}
 

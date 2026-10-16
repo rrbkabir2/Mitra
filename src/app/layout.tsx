@@ -4,6 +4,7 @@ import { MitraProvider } from '@/context/MitraContext';
 import { Header } from '@/components/Header';
 import { MobileNav } from '@/components/MobileNav';
 import { GlobalInputFixes } from '@/components/GlobalInputFixes';
+import { OfflineBanner } from '@/components/OfflineBanner';
 
 export const metadata: Metadata = {
   title: 'Mitra — Permanent Delivery Confirmation Trust Layer',
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
     'tamper proof records',
   ],
   authors: [{ name: 'Mitra Trust Platform' }],
-  robots: 'noindex, nofollow', // Protected household platform
+  robots: 'noindex, nofollow',
   manifest: '/manifest.json',
 };
 
@@ -45,6 +46,7 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <MitraProvider>
           <GlobalInputFixes />
+          <OfflineBanner />
           <div className="mitra-app">
             <Header />
             {children}

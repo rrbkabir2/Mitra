@@ -74,6 +74,12 @@ export interface Entry {
   whatsapp_message_id?: string | null;
   delivered_confirmed_at?: string | null;
   notes?: string | null;
+  is_corrected?: boolean;
+  edit_history?: Array<{
+    edited_at: string;
+    previous_values: Record<string, unknown>;
+    note?: string;
+  }>;
   created_at: string;
   // Joins
   vendor?: Vendor;

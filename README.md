@@ -17,27 +17,33 @@ In India and many parts of the world, households order daily milk and provisions
 **Mitra solves this trust problem permanently by creating a tamper-proof, jointly confirmed daily record.**
 
 ### 🌟 The Core Principle
-- **WhatsApp is the primary channel for the vendor.**
+- **Zero-Friction for the Vendor**:
   The vendor is non-technical, **never logs in**, **never installs an app**, and **never manages a password**.
-- All the vendor ever does is tap **Approve (स्वीकृत)** or **Deny (अस्वीकृत)** on a WhatsApp interactive message or tap a secure, single-tap tokenized link.
-- The household admin operates a full web application with comprehensive ledger control, instant reports, and usage tracking.
+- **Permanent, Informative Safeguard**:
+  The vendor receives neutral, tamper-proof daily delivery confirmations via WhatsApp, SMS, or direct phone dispatch. Their personal verification link (`/v/{token}`) displays a real-time, read-only delivery ledger.
+- **Dispute Resolution via Phone Call**:
+  Rather than fragile chat buttons, any delivery questions or disagreements are resolved directly via a 1-tap "Call Household" card (`tel:+91...`).
+- The household admin operates a full web application with comprehensive ledger control, instant reports, multi-channel dispatch, and automated backups.
 
 ---
 
 ## 🛡️ Core Trust Safeguards (Non-Negotiable Security Guarantees)
 
-1. **Admins Cannot Approve or Deny on Vendor Behalf**:
+1. **Admins Cannot Tamper with Vendor Records**:
    - The confirmation status of an entry is **strictly read-only for admins**.
    - There is no button, API route, or database permission that permits an admin session to mark an entry as `confirmed` or `denied`.
    - **Enforced at the PostgreSQL Trigger layer** (`enforce_tamper_proof_status`) and the API layer. Attempts by an admin session to forge status updates result in immediate database-level transaction rollback.
-2. **Zero Public Self-Serve Registration**:
+2. **Transparent Correction Trail**:
+   - When an entry is edited, an audit log records the correction reason, timestamp, and previous values. The vendor receives an automated correction notice across all active messaging channels.
+   - Any deleted entry flags subsequent replacement entries with a conspicuous **Corrected Entry** (`is_corrected`) badge to prevent billing confusion.
+3. **Zero Public Self-Serve Registration**:
    - There is **no public sign-up page** in the deployed application.
-   - Household accounts are provisioned exclusively through protected backend seeding (`npm run seed:admin`) or authenticated invites.
-3. **Cryptographic Per-Vendor Tokens**:
+   - Household accounts are provisioned exclusively through protected backend seeding (`npm run seed:admin`) or authenticated invites with strict email allow-listing (`rrbkabir2@gmail.com`).
+4. **Cryptographic Per-Vendor Tokens**:
    - Vendor links (`/v/{token}`) use unguessable, 32-byte cryptographically secure random tokens.
    - If a link is ever shared or compromised, admins can rotate or revoke the token instantly.
-4. **24-Hour Timeout Auto-Confirmation**:
-   - If a vendor does not dispute a delivery within 24 hours, the system auto-confirms it with `status_set_by = 'system_auto'`. The UI clearly distinguishes auto-confirmed entries from affirmative vendor approvals.
+5. **24-Hour Timeout Auto-Confirmation**:
+   - If an entry is not disputed within 24 hours, the system auto-confirms it with `status = 'auto-confirmed'` and `status_set_by = 'system_auto'`. The UI auditable proof distinguishes auto-confirmed entries from affirmative responses.
 
 ---
 
@@ -46,9 +52,11 @@ In India and many parts of the world, households order daily milk and provisions
 | Layer | Technology | Justification |
 | :--- | :--- | :--- |
 | **Framework** | **Next.js 15 (App Router)** | Full-stack server/client architecture in a single codebase. Server actions and API routes securely handle webhooks, HMAC signature verification, and service-role database operations without exposing secrets to browsers. |
-| **Language** | **TypeScript** | Strict type safety for complex financial ledgers, audit models, and WhatsApp payload schemas. |
-| **Database & Auth** | **Supabase (PostgreSQL + RLS)** | Production-grade relational database with declarative Row Level Security (RLS) guaranteeing multi-tenant isolation, plus managed storage for delivery photos within the 1GB free tier. |
-| **Messaging** | **Official WhatsApp Business Cloud API (Meta)** | Direct API integration with Meta's official Graph API for high deliverability, interactive reply buttons, and delivery status receipts. |
+| **Language** | **TypeScript 5.7** | Strict type safety for complex financial ledgers, audit models, and messaging payload schemas. |
+| **Primary Database & Auth** | **Supabase (PostgreSQL + RLS)** | Production-grade relational database with declarative Row Level Security (RLS) guaranteeing multi-tenant isolation, plus managed storage for delivery photos within the free tier. |
+| **Secondary Backup Database** | **MongoDB Atlas Cluster** | Real-time dual-write mirroring on every insert/update/delete. Provides instant disaster recovery via `npm run restore:mongo`. |
+| **Messaging Channels** | **3 Swappable Dispatchers** | Meta WhatsApp Business Cloud API, Fast2SMS Transactional Gateway (₹0.20/SMS), and Personal Phone 1-Tap Channel (`https://wa.me/` / native SMS). Multi-select enabled. |
+| **Android Target** | **Standalone APK + PWA** | Installable Android APK v0.1 (`/downloads/mitra-v0.1.apk`) + PWA with zero background battery execution guarantee. |
 | **Styling** | **Vanilla CSS (Design System Tokens)** | Pixel-perfect compliance with the canonical Figma specification, zero heavy framework overhead, custom glassmorphism, responsive 3x2 grid, and smooth micro-interactions. |
 | **Localization** | **Custom i18n Engine** | Comprehensive full-UI translation across English, Hindi (हिंदी), and Marathi (मराठी). |
 
@@ -60,24 +68,27 @@ In India and many parts of the world, households order daily milk and provisions
 - **3x2 Grid**: 0.5L, 1.0L, 1.5L, 2.0L, 2+L Custom Stepper, and Absent.
 - **Milk Variety Toggle**: Cow Milk (गाय का दूध) vs Buffalo Milk (भैंस का दूध) with active rate display.
 - **Quick Entry Modal**: Pre-filled quantity, delivery time, and calculated price.
-- **Bundled Extra Items**: Add curd, paneer, or extras to save on WhatsApp quota.
+- **Bundled Extra Items**: Add curd, paneer, or catalog extras to save on messaging quotas.
 - **Client-Side Photo Compression**: HTML5 Canvas compresses smartphone camera photos from 4MB to <150KB before upload.
 - **One-Tap Absent**: Marks 0 Litres and alerts the vendor that no milk was delivered today.
+- **Inline Correction & Detail Modal**: Tap any recorded entry to view photo proof, launch inline corrections, or delete entries with vendor re-notification.
 
 ### 2. Delivery History
+- Comprehensive timeframe filters: **Today**, **Month**, **Year**, **All**, and **Full Ledger**.
 - Row-by-row immutable ledger with date, items, total, and read-only status badges.
-- Detail modal with photo proof, WhatsApp delivery timestamp, and shareable vendor proof link.
+- Detail modal with photo proof, audit trail, correction history, and shareable vendor proof link.
+- Action triggers for transparent editing and entry deletion.
 
 ### 3. Price Management
 - Current active rate per milk variety.
-- Propose new price with trust safeguard notice (old rate remains active until approved by vendor on WhatsApp).
+- Propose new price with trust safeguard notice (old rate remains active until acknowledged by vendor).
 - Full audit log of all price change proposals.
 
 ### 4. Monthly Reports & Invoicing
 - Month selector with aggregated milk volume and total expenditure.
-- Confirmed vs. Pending vs. Absent breakdowns.
+- Confirmed vs. Auto-Confirmed vs. Pending vs. Absent breakdowns.
 - One-click **Print / Save as PDF** and **Download Plain Text Invoice**.
-- Auto-send monthly bill to vendor on month end via WhatsApp.
+- Vendor-specific toggle for automated month-end WhatsApp/SMS billing summary.
 
 ### 5. Products & Vendors Management
 - Add vendors (Dairy, Grocery, Other) with phone number.
@@ -86,23 +97,28 @@ In India and many parts of the world, households order daily milk and provisions
 
 ### 6. Send One-Time Purchase
 - Log non-recurring items (ghee, butter, sweets, groceries) outside daily milk.
-- Attaches receipt photo and dispatches one-off WhatsApp message.
+- Attaches receipt photo and dispatches one-off WhatsApp/SMS message.
 
-### 7. WhatsApp Usage & Free-Tier Tracker
-- Tracks consumption of the **1,000 free monthly service messages** provided by Meta.
-- Vendor-by-vendor usage breakdown and pace-based month-end projection.
-- Warning banner when trending to exceed the free tier.
-- **Built-in WhatsApp Webhook Simulator Console** for testing vendor approvals without live Meta credentials!
+### 7. Multi-Channel Messaging & Usage Trackers
+- Independent side-by-side trackers:
+  - **WhatsApp Cloud API**: Tracks consumption of Meta's 1,000 free monthly service conversations with pace projection.
+  - **Fast2SMS Gateway**: Message count tracker with live rupee expenditure calculations (~₹0.20/SMS).
+  - **Personal Phone 1-Tap**: History of manually dispatched native notifications.
+- Unified dispatch audit log showing all outgoing delivery confirmations.
+- **Built-in Webhook Simulator Console** for testing vendor delivery callbacks without live credentials.
 
 ### 8. Settings & Multi-Lingual Support
 - One-click language switcher: **English**, **Hindi (हिंदी)**, **Marathi (मराठी)**.
-- Advanced Mode toggle.
+- **Downloadable Android App**: One-click download of `mitra-v0.1.apk` + PWA Home Screen installation.
+- **Messaging Channels Multi-Select**: Enable or disable any combination of WhatsApp, Fast2SMS, and Personal Phone channels.
+- **MongoDB Atlas Backup Status**: Real-time cluster health check and connection latency monitor.
 - Storage cleanup job (pruning photos older than 30 days while permanently preserving ledger rows).
 
-### 9. Vendor Confirmation Portal (`/v/{token}`)
-- Zero-login, mobile-optimized portal for the delivery person.
-- Large, simple **Approve (स्वीकृत)** and **Deny (अस्वीकृत)** action buttons.
-- Isolated strictly to that specific vendor's deliveries.
+### 9. Vendor Read-Only View (`/v/{token}`)
+- Zero-login, mobile-optimized public portal for the delivery person.
+- Neutral, permanent record summary of today's delivery and cumulative monthly deliveries.
+- 1-tap "Call Household" dispute card for immediate voice clarification.
+- Strictly isolated to that specific vendor's deliveries.
 
 ---
 
@@ -161,6 +177,42 @@ The platform includes built-in reactive storage pre-seeded with realistic data s
    ```bash
    ADMIN_EMAIL=your@email.com ADMIN_PASSWORD=your_secure_password npm run seed:admin
    ```
+
+### Step C: Secondary MongoDB Atlas Setup & Disaster Recovery
+To provide complete data resilience and guard against single-provider cloud failures or accidental deletions, Mitra features real-time dual-database mirroring with MongoDB Atlas.
+
+1. **Create Free MongoDB Cluster**: Go to [mongodb.com/atlas](https://www.mongodb.com/atlas) and create a free M0 shared cluster.
+2. **Database Access & Network Access**:
+   - In Database Access, create a user (e.g. `mitra_admin`) with read/write privileges.
+   - In Network Access, whitelist `0.0.0.0/0` (allow access from anywhere) so Vercel serverless functions can connect.
+3. **Set Connection String**:
+   Copy your connection URI into `.env.local`:
+   ```env
+   MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/mitra_backup?retryWrites=true&w=majority
+   ```
+4. **Live Asynchronous Mirroring**:
+   Every database write in Mitra (new deliveries, price changes, products, purchases, edits, and deletions) automatically mirrors to the MongoDB Atlas cluster via the internal `/api/backup/mirror` pipeline.
+5. **1-Command Disaster Recovery Restore**:
+   If Supabase ever undergoes maintenance, data corruption, or accidental row deletion, run:
+   ```bash
+   npm run restore:mongo
+   ```
+   The restore script queries all collections from MongoDB Atlas (`households`, `vendors`, `products`, `entries`, `purchases`, `price_requests`) and restores/upserts them directly back into Supabase PostgreSQL.
+
+### Step D: Multi-Channel Messaging Setup (Fast2SMS & Personal Phone)
+1. **Fast2SMS Transactional Gateway**:
+   - Sign up at [fast2sms.com](https://www.fast2sms.com/) and obtain your Quick Transactional API Key.
+   - Add to `.env.local`:
+     ```env
+     FAST2SMS_API_KEY=your_fast2sms_api_key_here
+     ```
+   - Transactional SMS messages cost ~₹0.20 per message and deliver instantly within India without requiring Meta app verification.
+2. **Personal Phone 1-Tap Channel**:
+   - Requires zero external API keys.
+   - Generates pre-formatted WhatsApp Web (`https://wa.me/`) and SMS URIs (`sms:+91...`) for direct dispatch from the admin's smartphone.
+3. **Channel Multi-Select**:
+   - Navigate to **Settings** (`/settings`) &rarr; **Messaging Channels Configuration**.
+   - Check or uncheck any combination of the 3 channels. Delivery entries will automatically dispatch to all selected channels simultaneously.
 
 ---
 

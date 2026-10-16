@@ -62,18 +62,6 @@ export default function VendorPortalPage() {
     (pr) => pr.vendor_id === vendor.id && pr.status === 'pending'
   );
 
-  const handleApprove = (entryId: string) => {
-    confirmOrDenyDelivery(entryId, 'confirmed', 'vendor');
-    setActionNotice('Delivery successfully APPROVED. Joint record is permanently updated.');
-    setTimeout(() => setActionNotice(null), 5000);
-  };
-
-  const handleDeny = (entryId: string) => {
-    confirmOrDenyDelivery(entryId, 'denied', 'vendor');
-    setActionNotice('Delivery marked as DENIED. Customer has been alerted.');
-    setTimeout(() => setActionNotice(null), 5000);
-  };
-
   const handleResolvePrice = (requestId: string, status: 'approved' | 'denied') => {
     resolvePriceChange(requestId, status);
     setActionNotice(`Price request ${status === 'approved' ? 'ACCEPTED' : 'REJECTED'}.`);
@@ -133,13 +121,13 @@ export default function VendorPortalPage() {
       {/* SECTION 1: PENDING DELIVERIES AWAITING ACTION */}
       <section className="content-card">
         <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.4rem' }}>
-          {t.vendorPortal.pendingHeader}
+          Recent Deliveries & Daily Ledger
         </h3>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-          Please verify the quantities and tap Approve or Deny. Unconfirmed deliveries auto-confirm in 24 hours.
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+          This is a permanent, read-only transparent delivery record for Kabir Bundele. All items and quantities are recorded below. If you notice any discrepancy, please contact Kabir Bundele directly by phone.
         </p>
 
-        {pendingDeliveries.length === 0 ? (
+        {vendorEntries.length === 0 ? (
           <div
             style={{
               padding: '2rem 1rem',
@@ -151,15 +139,15 @@ export default function VendorPortalPage() {
             }}
           >
             <Check size={32} color="#059669" style={{ margin: '0 auto 0.5rem auto' }} />
-            {t.vendorPortal.noPending}
+            No delivery records logged yet for this vendor.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingDeliveries.map((entry) => (
+            {vendorEntries.map((entry) => (
               <div
                 key={entry.id}
                 style={{
-                  border: '1.5px solid #bfdbfe',
+                  border: '1.5px solid #e2e8f0',
                   borderRadius: 'var(--radius-lg)',
                   padding: '1.25rem',
                   background: '#ffffff',
@@ -184,6 +172,10 @@ export default function VendorPortalPage() {
                   </div>
                 </div>
 
+                <div style={{ marginTop: '0.4rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  Rate: ₹{entry.unit_price}/L {entry.is_corrected && <span style={{ color: '#0369a1', fontWeight: 700 }}>• (Corrected Entry)</span>}
+                </div>
+
                 {entry.extra_items?.length > 0 && (
                   <div style={{ marginTop: '0.65rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                     Extra items: {entry.extra_items.map((i) => `${i.name} (${i.quantity})`).join(', ')}
@@ -191,32 +183,35 @@ export default function VendorPortalPage() {
                 )}
 
                 {entry.photo_url && (
-                  <div style={{ marginTop: '0.75rem', maxHeight: '160px', overflow: 'hidden', borderRadius: 'var(--radius-md)' }}>
-                    <img src={entry.photo_url} alt="Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ marginTop: '0.75rem', maxHeight: '200px', overflow: 'hidden', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0' }}>
+                    <img src={entry.photo_url} alt="Delivery Photo Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                 )}
 
-                {/* Large Action Buttons */}
-                <div className="vendor-action-row">
-                  <button
-                    type="button"
-                    className="btn-vendor-approve"
-                    onClick={() => handleApprove(entry.id)}
-                    id={`btn-approve-${entry.id}`}
-                  >
-                    <ThumbsUp size={18} />
-                    <span>{t.vendorPortal.approveBtn}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn-vendor-deny"
-                    onClick={() => handleDeny(entry.id)}
-                    id={`btn-deny-${entry.id}`}
-                  >
-                    <ThumbsDown size={18} />
-                    <span>{t.vendorPortal.denyBtn}</span>
-                  </button>
+                {/* Read-Only Status & Dispute Info Card */}
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <StatusBadge status={entry.status} statusSetBy={entry.status_set_by} />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Permanent record
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Dispute? Call Kabir Bundele directly
+                  </span>
                 </div>
               </div>
             ))}
