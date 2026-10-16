@@ -69,6 +69,31 @@ export default function SettingsPage() {
   const [autoConfirmHours, setAutoConfirmHours] = useState<number>(household.auto_confirm_hours || 24);
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
 
+  // Requirement 22: Sample Data Seeding State
+  const [isSeedingData, setIsSeedingData] = useState<boolean>(false);
+  const [seedStatusMsg, setSeedStatusMsg] = useState<string | null>(null);
+
+  const handleSeedSampleData = async () => {
+    setIsSeedingData(true);
+    setSeedStatusMsg(null);
+    try {
+      const res = await fetch('/api/admin/seed', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setSeedStatusMsg('Successfully populated Supabase database with 5 months of realistic history (126 entries across 3 vendors)!');
+        setTimeout(() => {
+          if (typeof window !== 'undefined') window.location.reload();
+        }, 1200);
+      } else {
+        setSeedStatusMsg(`Seeding error: ${data.details || data.error || 'Failed to seed'}`);
+      }
+    } catch (err: any) {
+      setSeedStatusMsg(`Seeding request failed: ${err?.message}`);
+    } finally {
+      setIsSeedingData(false);
+    }
+  };
+
   // Admin Management State
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
   const [isLoadingAdmins, setIsLoadingAdmins] = useState<boolean>(true);
@@ -782,6 +807,54 @@ export default function SettingsPage() {
               </button>
             </form>
           </div>
+        </section>
+
+        {/* =========================================================================
+            POINT 22: VERIFICATION TESTING & 5-MONTH SAMPLE DATA SEEDING
+            ========================================================================= */}
+        <section className="content-card" id="section-sample-data">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
+            <div style={{ background: '#183d2d', color: '#ffffff', padding: '0.45rem', borderRadius: '10px', display: 'flex' }}>
+              <Layers size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.12rem', fontWeight: 800 }}>Sample Delivery History & Verification Data</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Populate or refresh database with 5 months (June–October 2026) of realistic deliveries across multiple vendors.
+              </p>
+            </div>
+          </div>
+
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '1rem' }}>
+            Enables full testing of History page filters (Status: Pending, Confirmed, Auto-Confirmed, Denied, Absent; Vendors: Ramesh Patil Dairy, Kisan Fresh Groceries, Amul Country Fresh; Multi-Month Date Range picker).
+          </p>
+
+          {seedStatusMsg && (
+            <div
+              style={{
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-md)',
+                background: seedStatusMsg.includes('error') || seedStatusMsg.includes('failed') ? '#fef2f2' : '#f0fdf4',
+                color: seedStatusMsg.includes('error') || seedStatusMsg.includes('failed') ? '#b91c1c' : '#15803d',
+                fontSize: '0.82rem',
+                marginBottom: '1rem',
+                fontWeight: 600,
+              }}
+            >
+              {seedStatusMsg}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleSeedSampleData}
+            disabled={isSeedingData}
+            className="btn-primary"
+            id="btn-seed-sample-data"
+            style={{ fontSize: '0.86rem', padding: '0.65rem 1.25rem' }}
+          >
+            {isSeedingData ? 'Populating Database (5 Months)...' : 'Seed 5 Months of Sample History'}
+          </button>
         </section>
       </div>
     </main>

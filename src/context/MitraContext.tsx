@@ -16,7 +16,15 @@ import {
 import { mitraStore } from '@/lib/store';
 import { translations, TranslationKeys } from '@/lib/i18n';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { isEmailAllowed, setClientAuthCookie, clearClientAuthCookie, getClientAuthCookie } from '@/lib/auth';
+import {
+  isEmailAllowed,
+  setClientAuthCookie,
+  clearClientAuthCookie,
+  getClientAuthCookie,
+  isInstalledMobileOrPWA,
+  isWebSessionValid,
+  touchUserActivity,
+} from '@/lib/auth';
 import { mirrorToMongoApi } from '@/lib/backupClient';
 import { messagingService } from '@/lib/messaging';
 
@@ -159,17 +167,33 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Verify Authentication on Mount
+  // Requirement 21: Verify Authentication on Mount with Web Browser Session Checking
   useEffect(() => {
     let isMounted = true;
     async function checkAuth() {
       setIsLoadingAuth(true);
 
       try {
+        const isTrustedApp = isInstalledMobileOrPWA();
+
+        // Web Browser Security Policy:
+        // If not an installed app, verify that the browser/tab session was not closed or expired due to inactivity
+        if (!isTrustedApp && !isWebSessionValid()) {
+          console.log('[Mitra Security] Web session terminated: browser closed or 60m inactivity reached.');
+          clearClientAuthCookie();
+          if (isSupabaseConfigured && supabase) {
+            await supabase.auth.signOut().catch(() => {});
+          }
+          if (isMounted) setIsAdminLoggedIn(false);
+          setIsLoadingAuth(false);
+          return;
+        }
+
         // Check cookie first
         const existingCookie = getClientAuthCookie();
         if (existingCookie && isEmailAllowed(existingCookie)) {
           if (isMounted) setIsAdminLoggedIn(true);
+          touchUserActivity();
         }
 
         // Check Supabase Auth session if configured
@@ -179,6 +203,7 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
             if (session?.user?.email && isEmailAllowed(session.user.email)) {
               if (isMounted) setIsAdminLoggedIn(true);
               setClientAuthCookie(session.user.email);
+              touchUserActivity();
               await fetchSupabaseData();
             } else if (session?.user?.email && !isEmailAllowed(session.user.email)) {
               // Unauthorized account
@@ -202,6 +227,40 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
     };
   }, [fetchSupabaseData]);
+
+  // Requirement 21: Active Web Inactivity Heartbeat & Auto-Timeout Detection
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+
+    const handleActivity = () => {
+      touchUserActivity();
+    };
+
+    window.addEventListener('pointerdown', handleActivity, { passive: true });
+    window.addEventListener('keydown', handleActivity, { passive: true });
+    window.addEventListener('touchstart', handleActivity, { passive: true });
+    window.addEventListener('scroll', handleActivity, { passive: true });
+
+    // Periodic check every 30 seconds for web inactivity timeout
+    const interval = setInterval(() => {
+      if (!isInstalledMobileOrPWA() && !isWebSessionValid()) {
+        console.warn('[Mitra Security] Web session expired due to inactivity or browser close.');
+        clearClientAuthCookie();
+        setIsAdminLoggedIn(false);
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login?reason=timeout';
+        }
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('pointerdown', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+      clearInterval(interval);
+    };
+  }, [isAdminLoggedIn]);
 
   // Point 8: Run 24h auto-confirmation check on mount and periodic sweep
   useEffect(() => {
@@ -247,6 +306,7 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
         if (!error && data?.user) {
           setIsAdminLoggedIn(true);
           setClientAuthCookie(cleanEmail);
+          touchUserActivity();
           // Sync database data in the background without blocking the UI transition
           fetchSupabaseData().catch((err) => console.warn('[Supabase Sync]', err));
           return true;
@@ -257,6 +317,7 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
           console.warn('[Mitra Auth] Falling back to pre-approved local admin credentials');
           setIsAdminLoggedIn(true);
           setClientAuthCookie(cleanEmail);
+          touchUserActivity();
           return true;
         }
 
@@ -269,6 +330,7 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
           console.warn('[Mitra Auth] Supabase unreachable or threw, falling back to local admin');
           setIsAdminLoggedIn(true);
           setClientAuthCookie(cleanEmail);
+          touchUserActivity();
           return true;
         }
         throw err;
@@ -279,6 +341,7 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
     if (cleanEmail === 'rrbkabir2@gmail.com' && (pass === 'mitra2026' || pass.length >= 6)) {
       setIsAdminLoggedIn(true);
       setClientAuthCookie(cleanEmail);
+      touchUserActivity();
       return true;
     }
 

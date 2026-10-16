@@ -78,6 +78,7 @@ In India and many parts of the world, households order daily milk and provisions
 - Comprehensive timeframe filters: **Today**, **Month**, **Year**, **Custom Date Range (Multi-Month From/To)**, **All**, and **Full Ledger**.
 - **Vendor Filter**: Narrow records down to an individual vendor or view all vendors combined.
 - **Filtered Downloadable Export**: One-click **Download Export** file (`.txt`) and **Print / PDF** reflecting the active filters (Date Range, Status, and Vendor) clearly labeled at the top of the statement.
+- **Enhanced Date & Month Inputs**: Clean padding, proper min-height, and reserved action spacing ensuring calendar picker icons display crisply without clipping or cramping across desktop and mobile browsers.
 - Row-by-row immutable ledger with date, items, total, and read-only status badges.
 - Detail modal with photo proof, audit trail, correction history, and shareable vendor proof link.
 - Action triggers for transparent editing and entry deletion.
@@ -110,7 +111,9 @@ In India and many parts of the world, households order daily milk and provisions
 - Unified dispatch audit log showing all outgoing delivery confirmations.
 - **Built-in Webhook Simulator Console** for testing vendor delivery callbacks without live credentials.
 
-### 8. Settings & Multi-Lingual Support
+### 8. Settings & Security
+- **Web Browser Session Auto-Expiry**: Closing the browser/tab or 60 minutes of inactivity requires admin re-authentication on shared computers, while trusted installed PWA/Android devices enjoy seamless persistent sessions.
+- **5-Month Realistic Sample Data Seeder**: Pre-loaded database generator covering June through October 2026 across 3 vendors (Ramesh Patil Dairy, Kisan Fresh Groceries, Amul Country Fresh) with a varied mix of statuses (Pending, Confirmed, Auto-Confirmed, Denied, Absent). Accessible via 1-click in Settings and `/api/admin/seed`.
 - One-click language switcher: **English**, **Hindi (हिंदी)**, **Marathi (मराठी)**.
 - **Downloadable Android App**: One-click download of `mitra-v0.1.apk` + PWA Home Screen installation.
 - **Messaging Channels Multi-Select**: Enable or disable any combination of WhatsApp, Fast2SMS, and Personal Phone channels.

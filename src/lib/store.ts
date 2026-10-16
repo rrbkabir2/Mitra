@@ -9,6 +9,7 @@ import {
   WhatsAppUsage,
   PurchaseRecord,
   Language,
+  ExtraItem,
 } from '@/types';
 
 // Initial pre-seeded sample data for immediate out-of-the-box local testing & verification
@@ -46,6 +47,18 @@ const DEFAULT_VENDORS: Vendor[] = [
     token_created_at: '2026-01-01T00:00:00.000Z',
     is_active: true,
     auto_monthly_report: true,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'v-03',
+    household_id: 'hh-01',
+    name: 'Amul Country Fresh',
+    phone_number: '+91 99887 76655',
+    vendor_type: 'dairy',
+    access_token: 'amul_country_token_3a91b2c4d5e6f7a8b9c0d1e2f3a4',
+    token_created_at: '2026-01-01T00:00:00.000Z',
+    is_active: true,
+    auto_monthly_report: false,
     created_at: '2026-01-01T00:00:00.000Z',
   },
 ];
@@ -93,107 +106,153 @@ const DEFAULT_PRODUCTS: Product[] = [
     is_milk_type: false,
     created_at: '2026-01-01T00:00:00.000Z',
   },
+  {
+    id: 'prod-05',
+    household_id: 'hh-01',
+    vendor_id: 'v-02',
+    name: 'Organic Farm Cow Milk',
+    unit_type: 'litre',
+    default_price: 68,
+    is_milk_type: true,
+    milk_subtype: 'cow',
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'prod-06',
+    household_id: 'hh-01',
+    vendor_id: 'v-03',
+    name: 'Taaza Buffalo Milk',
+    unit_type: 'litre',
+    default_price: 72,
+    is_milk_type: true,
+    milk_subtype: 'buffalo',
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
 ];
 
-// Helper to generate past dates in current month
-function getPastDate(daysAgo: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().split('T')[0];
+// Requirement 22: Generate rich, realistic 5-month sample delivery history
+function generateDefaultEntries(): Entry[] {
+  const result: Entry[] = [];
+  const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+
+  const months = [
+    { year: 2026, month: 6, days: 30 },
+    { year: 2026, month: 7, days: 31 },
+    { year: 2026, month: 8, days: 31 },
+    { year: 2026, month: 9, days: 30 },
+    { year: 2026, month: 10, days: 16 },
+  ];
+
+  let idCounter = 1;
+
+  for (const mc of months) {
+    for (let day = 1; day <= mc.days; day++) {
+      if ((day === 7 || day === 21 || day === 28) && mc.month !== 10) {
+        continue;
+      }
+
+      const dateStr = `${mc.year}-${pad2(mc.month)}-${pad2(day)}`;
+      const timeStr = `07:${pad2(10 + (day % 40))}`;
+      const entryId = `entry-${mc.year}${pad2(mc.month)}${pad2(day)}-${idCounter++}`;
+
+      let vendorId = 'v-01';
+      let productId = 'prod-01';
+      let unitPrice = 60;
+
+      if (day % 7 === 0) {
+        vendorId = 'v-02';
+        productId = 'prod-05';
+        unitPrice = 68;
+      } else if (day % 11 === 0) {
+        vendorId = 'v-03';
+        productId = 'prod-06';
+        unitPrice = 72;
+      } else if (day % 5 === 0) {
+        productId = 'prod-02';
+        unitPrice = 75;
+      }
+
+      let quantity = 1.5;
+      if (day % 3 === 0) quantity = 2.0;
+      if (day % 4 === 0) quantity = 1.0;
+
+      let status: EntryStatus = 'confirmed';
+      let statusSetBy: StatusSetBy | null = 'vendor';
+      let statusSetAt: string | null = new Date(`${dateStr}T08:30:00Z`).toISOString();
+      let notes: string | undefined = undefined;
+      const extraItems: ExtraItem[] = [];
+
+      if ((mc.month === 6 && day === 13) || (mc.month === 8 && day === 4) || (mc.month === 9 && day === 12)) {
+        status = 'absent';
+        statusSetBy = null;
+        statusSetAt = null;
+        quantity = 0;
+        notes = 'Doorstep container marked absent — family travelling.';
+      } else if ((mc.month === 7 && day === 19) || (mc.month === 8 && day === 23) || (mc.month === 9 && day === 15)) {
+        status = 'denied';
+        statusSetBy = 'vendor';
+        notes = 'Disputed delivery quantity: Vendor reported 1.0 L received instead of 1.5 L.';
+      } else if (day % 4 === 1 && mc.month <= 9) {
+        status = 'auto-confirmed';
+        statusSetBy = 'system_auto';
+        statusSetAt = new Date(`${dateStr}T09:00:00Z`).toISOString();
+        notes = 'Auto-confirmed by 24h background timer with zero vendor dispute.';
+      } else if (mc.month === 10 && day >= 14) {
+        status = 'pending';
+        statusSetBy = null;
+        statusSetAt = null;
+        notes = 'Delivered to doorstep — notification dispatched, awaiting confirmation.';
+      }
+
+      if (status !== 'absent' && (day % 6 === 0 || day === 15)) {
+        if (day % 2 === 0) {
+          extraItems.push({
+            id: `ex-curd-${dateStr}`,
+            name: 'Farm Fresh Dahi / Curd',
+            quantity: 1,
+            unit: 'count',
+            price: 40,
+          });
+        }
+        if (day % 6 === 0) {
+          extraItems.push({
+            id: `ex-paneer-${dateStr}`,
+            name: 'Fresh Malai Paneer',
+            quantity: 0.5,
+            unit: 'kilogram',
+            price: 190,
+          });
+        }
+      }
+
+      const extraTotal = extraItems.reduce((acc, curr) => acc + (curr.price || 0), 0);
+      const totalPrice = quantity * unitPrice + extraTotal;
+
+      result.push({
+        id: entryId,
+        household_id: 'hh-01',
+        vendor_id: vendorId,
+        product_id: productId,
+        quantity,
+        unit_price: unitPrice,
+        total_price: totalPrice,
+        extra_items: extraItems,
+        entry_date: dateStr,
+        entry_time: timeStr,
+        status,
+        status_set_by: statusSetBy,
+        status_set_at: statusSetAt,
+        delivered_confirmed_at: status !== 'pending' ? new Date(`${dateStr}T${timeStr}:00Z`).toISOString() : undefined,
+        notes,
+        created_at: new Date(`${dateStr}T${timeStr}:00Z`).toISOString(),
+      });
+    }
+  }
+
+  return result.reverse(); // newest first
 }
 
-const DEFAULT_ENTRIES: Entry[] = [
-  {
-    id: 'entry-01',
-    household_id: 'hh-01',
-    vendor_id: 'v-01',
-    product_id: 'prod-01',
-    quantity: 1.5,
-    unit_price: 60,
-    total_price: 90,
-    extra_items: [],
-    entry_date: getPastDate(1),
-    entry_time: '07:15',
-    status: 'confirmed',
-    status_set_by: 'vendor',
-    status_set_at: new Date(Date.now() - 86400000 + 1800000).toISOString(),
-    whatsapp_message_id: 'wamid_sample_01',
-    delivered_confirmed_at: new Date(Date.now() - 86400000).toISOString(),
-    notes: 'Left at doorstep container',
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'entry-02',
-    household_id: 'hh-01',
-    vendor_id: 'v-01',
-    product_id: 'prod-01',
-    quantity: 2.0,
-    unit_price: 60,
-    total_price: 120,
-    extra_items: [
-      { id: 'ex-1', name: 'Farm Fresh Dahi', quantity: 1, unit: 'count', price: 40 },
-    ],
-    entry_date: getPastDate(2),
-    entry_time: '07:20',
-    status: 'confirmed',
-    status_set_by: 'vendor',
-    status_set_at: new Date(Date.now() - 172800000 + 3600000).toISOString(),
-    whatsapp_message_id: 'wamid_sample_02',
-    delivered_confirmed_at: new Date(Date.now() - 172800000).toISOString(),
-    created_at: new Date(Date.now() - 172800000).toISOString(),
-  },
-  {
-    id: 'entry-03',
-    household_id: 'hh-01',
-    vendor_id: 'v-01',
-    product_id: 'prod-01',
-    quantity: 0,
-    unit_price: 60,
-    total_price: 0,
-    extra_items: [],
-    entry_date: getPastDate(3),
-    entry_time: '08:00',
-    status: 'absent',
-    status_set_by: null,
-    notes: 'Family out of station — marked absent',
-    created_at: new Date(Date.now() - 259200000).toISOString(),
-  },
-  {
-    id: 'entry-04',
-    household_id: 'hh-01',
-    vendor_id: 'v-01',
-    product_id: 'prod-01',
-    quantity: 1.0,
-    unit_price: 60,
-    total_price: 60,
-    extra_items: [],
-    entry_date: getPastDate(4),
-    entry_time: '07:10',
-    status: 'auto-confirmed',
-    status_set_by: 'system_auto',
-    status_set_at: new Date(Date.now() - 345600000 + 86400000).toISOString(),
-    whatsapp_message_id: 'wamid_sample_04',
-    delivered_confirmed_at: new Date(Date.now() - 345600000).toISOString(),
-    notes: 'Auto-confirmed after 24h with no vendor dispute',
-    created_at: new Date(Date.now() - 345600000).toISOString(),
-  },
-  {
-    id: 'entry-05',
-    household_id: 'hh-01',
-    vendor_id: 'v-01',
-    product_id: 'prod-01',
-    quantity: 1.5,
-    unit_price: 60,
-    total_price: 90,
-    extra_items: [],
-    entry_date: getPastDate(5),
-    entry_time: '07:25',
-    status: 'confirmed',
-    status_set_by: 'vendor',
-    status_set_at: new Date(Date.now() - 432000000 + 2000000).toISOString(),
-    created_at: new Date(Date.now() - 432000000).toISOString(),
-  },
-];
+const DEFAULT_ENTRIES: Entry[] = generateDefaultEntries();
 
 const DEFAULT_PRICE_REQUESTS: PriceChangeRequest[] = [
   {
@@ -208,6 +267,12 @@ const DEFAULT_PRICE_REQUESTS: PriceChangeRequest[] = [
     resolved_at: new Date(Date.now() - 860000000).toISOString(),
   },
 ];
+
+const getPastDate = (daysAgo: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toISOString().split('T')[0];
+};
 
 const DEFAULT_PURCHASES: PurchaseRecord[] = [
   {
@@ -272,34 +337,54 @@ class MitraStore {
       const v = localStorage.getItem('mitra_vendors');
       if (v) {
         this.vendors = JSON.parse(v);
-        // Ensure auto_monthly_report is set on all vendors
-        let updated = false;
-        this.vendors = this.vendors.map((vendor) => {
-          if (vendor.auto_monthly_report === undefined) {
-            updated = true;
-            return { ...vendor, auto_monthly_report: true };
-          }
-          return vendor;
-        });
-        if (updated) this.saveToStorage();
+        if (this.vendors.length < 3) {
+          this.vendors = DEFAULT_VENDORS;
+          this.saveToStorage();
+        } else {
+          // Ensure auto_monthly_report is set on all vendors
+          let updated = false;
+          this.vendors = this.vendors.map((vendor) => {
+            if (vendor.auto_monthly_report === undefined) {
+              updated = true;
+              return { ...vendor, auto_monthly_report: true };
+            }
+            return vendor;
+          });
+          if (updated) this.saveToStorage();
+        }
       }
 
       const p = localStorage.getItem('mitra_products');
-      if (p) this.products = JSON.parse(p);
+      if (p) {
+        this.products = JSON.parse(p);
+        if (this.products.length < 6) {
+          this.products = DEFAULT_PRODUCTS;
+          this.saveToStorage();
+        }
+      }
 
       const e = localStorage.getItem('mitra_entries');
       if (e) {
         this.entries = JSON.parse(e);
-        // Migration: entries previously set by system_auto with 'confirmed' are now correctly 'auto-confirmed'
-        let updatedEntries = false;
-        this.entries = this.entries.map((entry) => {
-          if (entry.status_set_by === 'system_auto' && entry.status === 'confirmed') {
-            updatedEntries = true;
-            return { ...entry, status: 'auto-confirmed' as EntryStatus };
-          }
-          return entry;
-        });
-        if (updatedEntries) this.saveToStorage();
+        // Requirement 22: If local storage has 5 or fewer entries, upgrade with the 5-month realistic history dataset
+        if (this.entries.length <= 5) {
+          this.entries = DEFAULT_ENTRIES;
+          this.saveToStorage();
+        } else {
+          // Migration: entries previously set by system_auto with 'confirmed' are now correctly 'auto-confirmed'
+          let updatedEntries = false;
+          this.entries = this.entries.map((entry) => {
+            if (entry.status_set_by === 'system_auto' && entry.status === 'confirmed') {
+              updatedEntries = true;
+              return { ...entry, status: 'auto-confirmed' as EntryStatus };
+            }
+            return entry;
+          });
+          if (updatedEntries) this.saveToStorage();
+        }
+      } else {
+        this.entries = DEFAULT_ENTRIES;
+        this.saveToStorage();
       }
 
       const pr = localStorage.getItem('mitra_price_requests');

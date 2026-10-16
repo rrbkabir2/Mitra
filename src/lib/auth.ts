@@ -44,22 +44,108 @@ export function isEmailAllowed(email: string | null | undefined): boolean {
 }
 
 export const MITRA_AUTH_COOKIE_NAME = 'mitra_auth_session';
+export const WEB_SESSION_ACTIVE_KEY = 'mitra_web_session_active';
+export const WEB_SESSION_LAST_ACTIVE_KEY = 'mitra_web_last_active';
+export const WEB_INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes inactivity expiry
+
+/**
+ * Checks if the application is running in an installed mobile app or PWA standalone window.
+ * Requirement 21: Installed Android APK / PWA is a trusted personal environment that may stay
+ * logged in longer, whereas standard web browsers must expire upon close or inactivity.
+ */
+export function isInstalledMobileOrPWA(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const isIOSStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    const isAndroidApp =
+      document.referrer?.startsWith('android-app://') ||
+      window.location.search.includes('platform=pwa') ||
+      window.location.search.includes('standalone=true') ||
+      localStorage.getItem('mitra_pwa_mode') === 'true';
+    return Boolean(isStandalone || isIOSStandalone || isAndroidApp);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Client-side session cookie helpers
+ * On Web: Sets a true session cookie (no expires/Max-Age) + sessionStorage token,
+ * so closing Chrome/browser tab or 60 min inactivity terminates the session.
+ * On Installed Mobile / PWA: Sets a persistent 30-day cookie for typical mobile app persistence.
  */
-export function setClientAuthCookie(email: string) {
+export function setClientAuthCookie(email: string, forcePersistent?: boolean) {
   if (typeof document === 'undefined') return;
-  const expiryDays = 7;
-  const date = new Date();
-  date.setTime(date.getTime() + expiryDays * 24 * 60 * 60 * 1000);
-  const expires = `expires=${date.toUTCString()}`;
-  document.cookie = `${MITRA_AUTH_COOKIE_NAME}=${encodeURIComponent(email)}; ${expires}; path=/; SameSite=Lax`;
+
+  const isTrustedApp = isInstalledMobileOrPWA() || forcePersistent;
+
+  if (isTrustedApp) {
+    // 30 days persistent cookie for trusted mobile device
+    const expiryDays = 30;
+    const date = new Date();
+    date.setTime(date.getTime() + expiryDays * 24 * 60 * 60 * 1000);
+    const expires = `expires=${date.toUTCString()}`;
+    document.cookie = `${MITRA_AUTH_COOKIE_NAME}=${encodeURIComponent(email)}; ${expires}; path=/; SameSite=Lax`;
+  } else {
+    // Session cookie: omitted expires & max-age forces browser to discard cookie on session close
+    document.cookie = `${MITRA_AUTH_COOKIE_NAME}=${encodeURIComponent(email)}; path=/; SameSite=Lax`;
+    
+    // Scoped to active browser tab/window; cleared instantly when tab or browser is fully closed
+    try {
+      sessionStorage.setItem(WEB_SESSION_ACTIVE_KEY, 'true');
+      sessionStorage.setItem(WEB_SESSION_LAST_ACTIVE_KEY, Date.now().toString());
+    } catch {}
+  }
+}
+
+/**
+ * Validates whether the active web session is still fresh and unexpired.
+ * Returns false if the browser was closed/reopened or if inactivity exceeded 60 minutes.
+ */
+export function isWebSessionValid(): boolean {
+  if (typeof window === 'undefined') return true;
+  if (isInstalledMobileOrPWA()) return true; // Installed PWA bypasses strict web session expiry
+
+  try {
+    const isActive = sessionStorage.getItem(WEB_SESSION_ACTIVE_KEY);
+    if (!isActive) return false; // Tab / browser was closed
+
+    const lastActiveStr = sessionStorage.getItem(WEB_SESSION_LAST_ACTIVE_KEY);
+    if (!lastActiveStr) return false;
+
+    const lastActive = parseInt(lastActiveStr, 10);
+    if (isNaN(lastActive) || Date.now() - lastActive > WEB_INACTIVITY_TIMEOUT_MS) {
+      return false; // Timed out due to inactivity
+    }
+
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+let lastTouchTime = 0;
+/**
+ * Throttled activity heartbeat updater for web sessions
+ */
+export function touchUserActivity() {
+  if (typeof window === 'undefined') return;
+  const now = Date.now();
+  if (now - lastTouchTime < 15000) return; // Update at most once every 15 seconds
+  lastTouchTime = now;
+  try {
+    sessionStorage.setItem(WEB_SESSION_LAST_ACTIVE_KEY, now.toString());
+  } catch {}
 }
 
 export function clearClientAuthCookie() {
   if (typeof document === 'undefined') return;
   document.cookie = `${MITRA_AUTH_COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+  try {
+    sessionStorage.removeItem(WEB_SESSION_ACTIVE_KEY);
+    sessionStorage.removeItem(WEB_SESSION_LAST_ACTIVE_KEY);
+  } catch {}
 }
 
 export function getClientAuthCookie(): string | null {

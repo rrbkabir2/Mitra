@@ -419,7 +419,7 @@ export default function HistoryPage() {
                 value={filterMonth}
                 onChange={(e) => setFilterMonth(e.target.value)}
                 className="form-input"
-                style={{ width: 'auto', padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 700 }}
+                style={{ width: 'auto', minHeight: '38px', padding: '0.4rem 0.75rem', fontSize: '0.84rem', fontWeight: 700 }}
                 id="select-history-month"
               />
             )}
@@ -430,7 +430,7 @@ export default function HistoryPage() {
                 value={filterYear}
                 onChange={(e) => setFilterYear(e.target.value)}
                 className="form-select"
-                style={{ width: 'auto', padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 700 }}
+                style={{ width: 'auto', minHeight: '38px', padding: '0.4rem 0.75rem', fontSize: '0.84rem', fontWeight: 700 }}
                 id="select-history-year"
               >
                 <option value="2026">2026</option>
@@ -441,23 +441,23 @@ export default function HistoryPage() {
 
             {/* If Range Filter chosen: show Multi-Month Date Range Pickers (Requirement 20) */}
             {deliveryFilter === 'range' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', background: '#f8fafc', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>From:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', background: '#f8fafc', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>From:</span>
                 <input
                   type="month"
                   value={fromMonth}
                   onChange={(e) => setFromMonth(e.target.value)}
                   className="form-input"
-                  style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.8rem', fontWeight: 700 }}
+                  style={{ width: 'auto', minHeight: '38px', padding: '0.4rem 0.75rem', fontSize: '0.84rem', fontWeight: 700 }}
                   id="select-history-from-month"
                 />
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>To:</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>To:</span>
                 <input
                   type="month"
                   value={toMonth}
                   onChange={(e) => setToMonth(e.target.value)}
                   className="form-input"
-                  style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.8rem', fontWeight: 700 }}
+                  style={{ width: 'auto', minHeight: '38px', padding: '0.4rem 0.75rem', fontSize: '0.84rem', fontWeight: 700 }}
                   id="select-history-to-month"
                 />
               </div>
@@ -533,21 +533,41 @@ export default function HistoryPage() {
               </select>
             </div>
 
-            {/* Date Search Input */}
-            <div style={{ position: 'relative', width: '160px' }}>
+            {/* Date Search Input - Enhanced styling to eliminate cramped/clipped calendar icon (Requirement 23) */}
+            <div style={{ position: 'relative', minWidth: '185px' }}>
               <input
                 type="date"
                 value={dateSearch}
                 onChange={(e) => setDateSearch(e.target.value)}
                 className="form-input"
-                style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
+                style={{
+                  fontSize: '0.84rem',
+                  minHeight: '38px',
+                  padding: dateSearch ? '0.4rem 2.4rem 0.4rem 0.75rem' : '0.4rem 0.75rem',
+                  width: '100%',
+                }}
                 aria-label={t.history.searchDate}
                 placeholder="Specific date"
               />
               {dateSearch && (
                 <button
+                  type="button"
                   onClick={() => setDateSearch('')}
-                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+                  style={{
+                    position: 'absolute',
+                    right: '34px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#64748b',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Clear date filter"
                 >
                   <X size={14} />
                 </button>

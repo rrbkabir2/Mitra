@@ -30,14 +30,20 @@ function LoginForm() {
     }
   }, [isAdminLoggedIn, searchParams]);
 
-  // Check for rejected OAuth redirect
+  // Check for rejected OAuth redirect or session expiry
   useEffect(() => {
     const err = searchParams.get('error');
     const rejectedEmail = searchParams.get('email');
+    const reason = searchParams.get('reason');
+
     if (err === 'unauthorized_email') {
       setErrorMsg(
         `Access Denied: The account ${rejectedEmail ? `"${rejectedEmail}"` : ''} is not on the pre-approved admin allow-list. Only Kabir Bundele's authorized admin account (rrbkabir2@gmail.com) can access Mitra.`
       );
+    } else if (reason === 'timeout') {
+      setErrorMsg('Session Expired: You were automatically signed out after 60 minutes of inactivity for your security.');
+    } else if (reason === 'session_expired') {
+      setErrorMsg('Session Ended: For web security, your session expires when the browser is closed. Please sign in to continue.');
     }
   }, [searchParams]);
 
