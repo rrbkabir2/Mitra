@@ -340,6 +340,127 @@ class MessagingService {
 
     return { channelResults: results };
   }
+
+  /**
+   * Requirement 28: Dispatches one-time purchase notifications through ALL enabled channels
+   * (WhatsApp Cloud API, Fast2SMS, Personal Phone 1-tap)
+   */
+  public async dispatchPurchase(params: {
+    vendorPhone: string;
+    vendorName: string;
+    vendorToken?: string;
+    productName: string;
+    quantity: number;
+    unit?: string;
+    totalPrice: number;
+    date: string;
+    photoUrl?: string | null;
+    appUrl: string;
+  }): Promise<{
+    channelResults: Record<MessagingChannel, { attempted: boolean; success: boolean; personalUrl?: string; error?: string }>;
+    summaryText: string;
+  }> {
+    const portalUrl = params.vendorToken ? `${params.appUrl}/v/${params.vendorToken}` : params.appUrl;
+    const unitLabel = params.unit ? ` (${params.unit})` : '';
+    const messageText =
+      `🛍️ *Mitra Purchase Record*\n` +
+      `Namaste ${params.vendorName} ji,\n\n` +
+      `A one-time purchase has been recorded by Kabir Bundele:\n` +
+      `📅 *Date:* ${params.date}\n` +
+      `📦 *Item:* ${params.productName}\n` +
+      `⚖️ *Quantity:* ${params.quantity}${unitLabel}\n` +
+      `💰 *Total Amount:* ₹${params.totalPrice}\n` +
+      `\n🔒 *Permanent Record:* Transparent & recorded in household ledger. If any questions, call Kabir Bundele directly.\n` +
+      `\n🌐 View purchase details: ${portalUrl}`;
+
+    const results: Record<
+      MessagingChannel,
+      { attempted: boolean; success: boolean; personalUrl?: string; error?: string }
+    > = {
+      whatsapp_cloud: { attempted: false, success: false },
+      fast2sms: { attempted: false, success: false },
+      personal_phone: { attempted: false, success: false },
+    };
+
+    const cleanPhone = params.vendorPhone.replace(/[^0-9]/g, '');
+    const dispatchedChannels: string[] = [];
+
+    // 1. Channel A: WhatsApp Cloud API
+    if (this.enabledChannels.includes('whatsapp_cloud')) {
+      results.whatsapp_cloud.attempted = true;
+      try {
+        const res = await sendWhatsAppDeliveryMessage({
+          vendorPhone: cleanPhone,
+          vendorName: params.vendorName,
+          vendorToken: params.vendorToken || '',
+          entryId: `purchase-${Date.now()}`,
+          date: params.date,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          milkType: params.productName,
+          quantity: params.quantity,
+          unitPrice: params.totalPrice / (params.quantity || 1),
+          totalPrice: params.totalPrice,
+          photoUrl: params.photoUrl,
+          appUrl: params.appUrl,
+        });
+        results.whatsapp_cloud.success = res.success;
+        if (res.success) dispatchedChannels.push('WhatsApp Cloud API');
+        this.logMessage('whatsapp_cloud', params.vendorPhone, res.success ? 'success' : 'failed', 0, res.error);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'WhatsApp API error';
+        results.whatsapp_cloud.error = msg;
+        this.logMessage('whatsapp_cloud', params.vendorPhone, 'failed', 0, msg);
+      }
+    }
+
+    // 2. Channel B: Fast2SMS / Transactional SMS
+    if (this.enabledChannels.includes('fast2sms')) {
+      results.fast2sms.attempted = true;
+      try {
+        const smsRes = await fetch('/api/messaging/fast2sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: cleanPhone,
+            message: messageText,
+            entryId: `purchase-${Date.now()}`,
+          }),
+        });
+        const smsData = await smsRes.json();
+        const success = smsRes.ok && smsData.success;
+        results.fast2sms.success = success;
+        if (success) dispatchedChannels.push('Fast2SMS');
+        this.logMessage(
+          'fast2sms',
+          params.vendorPhone,
+          success ? 'success' : 'failed',
+          FAST2SMS_COST_PER_MSG,
+          smsData.message || (success ? 'SMS Delivered' : 'Failed')
+        );
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Fast2SMS network error';
+        results.fast2sms.error = msg;
+        this.logMessage('fast2sms', params.vendorPhone, 'failed', FAST2SMS_COST_PER_MSG, msg);
+      }
+    }
+
+    // 3. Channel C: Personal Phone 1-Tap Channel
+    if (this.enabledChannels.includes('personal_phone')) {
+      results.personal_phone.attempted = true;
+      const personalUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(messageText)}`;
+      results.personal_phone.personalUrl = personalUrl;
+      results.personal_phone.success = true;
+      dispatchedChannels.push('Personal Phone 1-Tap');
+      this.logMessage('personal_phone', params.vendorPhone, 'success', 0, 'Prepared for 1-tap dispatch');
+    }
+
+    const summaryText =
+      dispatchedChannels.length > 0
+        ? `Dispatched across: ${dispatchedChannels.join(', ')}`
+        : 'Logged to household ledger';
+
+    return { channelResults: results, summaryText };
+  }
 }
 
 export const messagingService = new MessagingService();

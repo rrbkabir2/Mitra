@@ -6,15 +6,18 @@ import { useMitra } from '@/context/MitraContext';
 import { MilkBottleIcon } from '@/components/MilkBottleIcon';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { isEmailAllowed, ADMIN_ALLOWLIST } from '@/lib/auth';
-import { Lock, Mail, ShieldAlert, ArrowRight, CheckCircle2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Lock, Mail, ShieldAlert, ArrowRight, CheckCircle2, ShieldCheck, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, loginAdmin, isAdminLoggedIn } = useMitra();
 
-  const [email, setEmail] = useState('rrbkabir2@gmail.com');
-  const [password, setPassword] = useState('mitra2026');
+  // Requirement 25: Fields load completely empty by default, no pre-fill
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  // Requirement 24: Password visibility toggle state
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -246,8 +249,8 @@ function LoginForm() {
         <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />
       </div>
 
-      {/* 2. Email & Password Form */}
-      <form onSubmit={handleSubmit}>
+      {/* 2. Email & Password Form (Requirements 24 & 25) */}
+      <form onSubmit={handleSubmit} autoComplete="off" noValidate={false}>
         <div className="form-group">
           <label className="form-label" htmlFor="admin-email">
             Admin Email Address
@@ -256,12 +259,17 @@ function LoginForm() {
             <input
               type="email"
               id="admin-email"
+              name="admin-email-field"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="form-input"
               required
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               style={{ paddingLeft: '2.5rem' }}
-              placeholder="rrbkabir2@gmail.com"
+              placeholder="e.g. rrbkabir2@gmail.com"
             />
             <Mail
               size={16}
@@ -277,20 +285,47 @@ function LoginForm() {
           </label>
           <div style={{ position: 'relative' }}>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               id="admin-password"
+              name="admin-password-field"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="form-input"
               required
-              style={{ paddingLeft: '2.5rem' }}
-              placeholder="••••••••"
+              autoComplete="new-password"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              style={{ paddingLeft: '2.5rem', paddingRight: '2.75rem' }}
+              placeholder="Enter your password"
             />
             <Lock
               size={16}
               color="#94a3b8"
               style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: '#64748b',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              id="btn-toggle-password-visibility"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
         </div>
 

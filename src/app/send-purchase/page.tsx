@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useMitra } from '@/context/MitraContext';
 import { compressImage } from '@/lib/imageCompression';
 import { CleanNumberInput } from '@/components/CleanNumberInput';
+import { messagingService, MessagingChannel } from '@/lib/messaging';
 import {
   ShoppingBag,
   Send,
@@ -11,20 +12,41 @@ import {
   CheckCircle,
   Calendar,
   X,
-  Clock,
+  ExternalLink,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 
 export default function SendPurchasePage() {
-  const { t, vendors, purchases, addPurchase, household } = useMitra();
+  const { t, vendors, products, purchases, addPurchase, household } = useMitra();
 
   const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
+  
+  // Requirement 27: Catalog dropdown selection vs. custom typing
+  const [selectedCatalogProductId, setSelectedCatalogProductId] = useState<string>('');
+  const [isCustomProduct, setIsCustomProduct] = useState(false);
   const [productName, setProductName] = useState('');
+  const [productUnit, setProductUnit] = useState<string>('count');
   const [quantity, setQuantity] = useState(1);
   const [totalPrice, setTotalPrice] = useState(250);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
+  
+  // Requirement 28: Toast state with multi-channel details & optional 1-tap personal phone URL
+  const [toastData, setToastData] = useState<{ message: string; personalUrl?: string } | null>(null);
+  const [enabledChannels, setEnabledChannels] = useState<MessagingChannel[]>([]);
+
+  useEffect(() => {
+    setEnabledChannels(messagingService.getEnabledChannels());
+  }, []);
+
+  // Sync selectedVendorId if empty
+  useEffect(() => {
+    if (!selectedVendorId && vendors.length > 0) {
+      setSelectedVendorId(vendors[0].id);
+    }
+  }, [vendors, selectedVendorId]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -43,19 +65,61 @@ export default function SendPurchasePage() {
     }
   };
 
+  // Requirement 27: When choosing a product from the saved catalog
+  const handleSelectCatalogProduct = (prodId: string) => {
+    setSelectedCatalogProductId(prodId);
+    if (prodId === 'custom') {
+      setIsCustomProduct(true);
+      setSelectedCatalogProductId('');
+      setProductName('');
+      setProductUnit('count');
+      return;
+    }
+
+    const found = products.find((p) => p.id === prodId);
+    if (found) {
+      setIsCustomProduct(false);
+      setProductName(found.name);
+      setProductUnit(found.unit_type);
+      setTotalPrice(found.default_price * quantity);
+      if (found.vendor_id && vendors.some((v) => v.id === found.vendor_id)) {
+        setSelectedVendorId(found.vendor_id);
+      }
+    } else {
+      setIsCustomProduct(false);
+      setProductName('');
+    }
+  };
+
+  const handleQuantityChange = (newQty: number) => {
+    const cleanQty = newQty > 0 ? newQty : 1;
+    setQuantity(cleanQty);
+    if (!isCustomProduct && selectedCatalogProductId) {
+      const found = products.find((p) => p.id === selectedCatalogProductId);
+      if (found) {
+        setTotalPrice(found.default_price * cleanQty);
+      }
+    }
+  };
+
+  // Requirement 28: Record and dispatch across all enabled channels
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productName || !selectedVendorId) return;
+    if (!productName.trim() || !selectedVendorId) return;
 
     setIsSubmitting(true);
     const vendor = vendors.find((v) => v.id === selectedVendorId) || vendors[0];
     const today = new Date().toISOString().split('T')[0];
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+
+    const recordedName = `${productName.trim()}${productUnit && productUnit !== 'count' ? ` (${productUnit})` : ''}`;
 
     try {
+      // 1. Record purchase in household ledger
       await addPurchase({
         household_id: household.id,
         vendor_id: selectedVendorId,
-        product_name: productName,
+        product_name: recordedName,
         quantity,
         total_price: totalPrice,
         photo_url: photoDataUrl,
@@ -63,14 +127,33 @@ export default function SendPurchasePage() {
         vendor_name: vendor?.name,
       });
 
-      setSuccessToast(
-        `Purchase of ${productName} (₹${totalPrice}) logged and dispatched to ${vendor?.name} on WhatsApp!`
-      );
+      // 2. Dispatch through ALL active channels (WhatsApp, Fast2SMS, Personal Phone)
+      const dispatchRes = await messagingService.dispatchPurchase({
+        vendorPhone: vendor?.phone_number || '',
+        vendorName: vendor?.name || 'Vendor',
+        vendorToken: vendor?.access_token,
+        productName: productName.trim(),
+        quantity,
+        unit: productUnit,
+        totalPrice,
+        date: today,
+        photoUrl: photoDataUrl,
+        appUrl: origin,
+      });
+
+      setToastData({
+        message: `Purchase of ${productName} (₹${totalPrice}) recorded! ${dispatchRes.summaryText}`,
+        personalUrl: dispatchRes.channelResults.personal_phone?.personalUrl,
+      });
+
+      // Reset form
       setProductName('');
+      setSelectedCatalogProductId('');
+      setIsCustomProduct(false);
       setQuantity(1);
       setTotalPrice(250);
       setPhotoDataUrl(null);
-      setTimeout(() => setSuccessToast(null), 6000);
+      setTimeout(() => setToastData(null), 10000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send purchase';
       alert(msg);
@@ -81,8 +164,8 @@ export default function SendPurchasePage() {
 
   return (
     <main className="main-content" id="send-purchase-page">
-      {/* Success Toast */}
-      {successToast && (
+      {/* Success Notification with Multi-Channel Summary and optional 1-Tap Trigger */}
+      {toastData && (
         <div
           style={{
             position: 'fixed',
@@ -94,14 +177,50 @@ export default function SendPurchasePage() {
             borderRadius: 'var(--radius-lg)',
             padding: '1rem 1.25rem',
             boxShadow: 'var(--shadow-xl)',
-            maxWidth: '420px',
+            maxWidth: '440px',
             display: 'flex',
             alignItems: 'flex-start',
             gap: '0.75rem',
           }}
+          role="status"
         >
           <CheckCircle size={20} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <p style={{ fontSize: '0.85rem', color: '#065f46', lineHeight: 1.45 }}>{successToast}</p>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: '0.85rem', color: '#065f46', lineHeight: 1.45, fontWeight: 600 }}>
+              {toastData.message}
+            </p>
+            {toastData.personalUrl && (
+              <a
+                href={toastData.personalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  marginTop: '0.65rem',
+                  fontSize: '0.78rem',
+                  padding: '0.4rem 0.85rem',
+                  background: '#25D366',
+                  borderColor: '#25D366',
+                  color: '#ffffff',
+                  textDecoration: 'none',
+                  borderRadius: '6px',
+                }}
+              >
+                <span>Open WhatsApp (1-Tap Send)</span>
+                <ExternalLink size={13} />
+              </a>
+            )}
+          </div>
+          <button
+            onClick={() => setToastData(null)}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2 }}
+            aria-label="Close notification"
+          >
+            <X size={15} />
+          </button>
         </div>
       )}
 
@@ -123,6 +242,7 @@ export default function SendPurchasePage() {
           </h3>
 
           <form onSubmit={handleSubmit}>
+            {/* Vendor Selector */}
             <div className="form-group">
               <label className="form-label">{t.sendPurchase.vendor}</label>
               <select
@@ -130,6 +250,7 @@ export default function SendPurchasePage() {
                 onChange={(e) => setSelectedVendorId(e.target.value)}
                 className="form-select"
                 required
+                id="select-purchase-vendor"
               >
                 {vendors.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -139,27 +260,114 @@ export default function SendPurchasePage() {
               </select>
             </div>
 
+            {/* Requirement 27: Product Selection from Catalog or Custom Entry */}
             <div className="form-group">
-              <label className="form-label">{t.sendPurchase.productName}</label>
-              <input
-                type="text"
-                placeholder="e.g. Desi Cow Ghee (1kg), Khoya, Basmati Rice"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                className="form-input"
-                required
-                id="input-purchase-name"
-              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>
+                  Product Name
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomProduct(!isCustomProduct);
+                    if (!isCustomProduct) {
+                      setSelectedCatalogProductId('');
+                      setProductName('');
+                    }
+                  }}
+                  style={{
+                    fontSize: '0.74rem',
+                    color: '#183d2d',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    textDecoration: 'underline',
+                  }}
+                  id="btn-toggle-custom-product"
+                >
+                  {isCustomProduct ? '← Select from Catalog' : '✏️ + Type New / Custom Product'}
+                </button>
+              </div>
+
+              {!isCustomProduct ? (
+                <div>
+                  <select
+                    value={selectedCatalogProductId}
+                    onChange={(e) => handleSelectCatalogProduct(e.target.value)}
+                    className="form-select"
+                    id="select-purchase-product-catalog"
+                  >
+                    <option value="">-- Choose from saved product catalog --</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.unit_type} • ₹{p.default_price})
+                      </option>
+                    ))}
+                    <option value="custom">✏️ + Type a brand new product name</option>
+                  </select>
+
+                  {selectedCatalogProductId && selectedCatalogProductId !== 'custom' && (
+                    <div
+                      style={{
+                        marginTop: '0.45rem',
+                        fontSize: '0.76rem',
+                        color: '#15803d',
+                        background: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        padding: '0.35rem 0.65rem',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>
+                        Catalog: <strong>{productName}</strong> ({productUnit})
+                      </span>
+                      <span style={{ fontWeight: 600 }}>Rate auto-calculated</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    placeholder="e.g. Pure Desi Cow Ghee (500g), Khoya, Basmati Rice"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    className="form-input"
+                    required
+                    id="input-purchase-name"
+                    autoFocus
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Unit:</span>
+                    {(['count', 'kilogram', 'litre'] as const).map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => setProductUnit(u)}
+                        className={`filter-pill-btn ${productUnit === u ? 'active' : ''}`}
+                        style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Quantity and Price */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
               <div className="form-group">
                 <label className="form-label">{t.sendPurchase.quantity}</label>
                 <CleanNumberInput
-                  min={1}
+                  min={0.5}
                   step="0.5"
                   value={quantity}
-                  onChange={(val) => setQuantity(val || 1)}
+                  onChange={(val) => handleQuantityChange(val || 1)}
                   className="form-input"
                   required
                   id="input-purchase-quantity"
@@ -167,7 +375,7 @@ export default function SendPurchasePage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">{t.sendPurchase.price}</label>
+                <label className="form-label">{t.sendPurchase.price} (₹ Total)</label>
                 <CleanNumberInput
                   min={0}
                   step="1"
@@ -214,15 +422,67 @@ export default function SendPurchasePage() {
               )}
             </div>
 
+            {/* Requirement 28: Active Dispatch Channels Indicator */}
+            <div
+              style={{
+                marginTop: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.75rem',
+                color: '#475569',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.4rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+                <MessageSquare size={13} color="#183d2d" />
+                <span>Active Channels:</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                {enabledChannels.length === 0 ? (
+                  <span style={{ color: '#94a3b8' }}>None (Local Ledger Only)</span>
+                ) : (
+                  enabledChannels.map((ch) => (
+                    <span
+                      key={ch}
+                      style={{
+                        background: '#e2e8f0',
+                        color: '#1e293b',
+                        padding: '0.1rem 0.4rem',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {ch === 'whatsapp_cloud'
+                        ? 'WhatsApp Cloud API'
+                        : ch === 'fast2sms'
+                        ? 'Fast2SMS'
+                        : 'Personal Phone'}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !productName.trim()}
               className="btn-primary"
               id="btn-submit-purchase"
-              style={{ marginTop: '0.5rem' }}
+              style={{ marginTop: '0.85rem', width: '100%' }}
             >
               <Send size={16} />
-              <span>{isSubmitting ? 'Logging & Sending...' : t.sendPurchase.submitBtn}</span>
+              <span>
+                {isSubmitting
+                  ? 'Recording & Sending across channels...'
+                  : 'Record & Send Purchase'}
+              </span>
             </button>
           </form>
         </section>

@@ -100,8 +100,9 @@ In India and many parts of the world, households order daily milk and provisions
 - Add products with custom unit types (`litre`, `kilogram`, `count`).
 
 ### 6. Send One-Time Purchase
-- Log non-recurring items (ghee, butter, sweets, groceries) outside daily milk.
-- Attaches receipt photo and dispatches one-off WhatsApp/SMS message.
+- **Product Catalog Dropdown**: Select existing catalog products directly with auto-filled units and rates, alongside a "+ Type New Product" free-form option.
+- **Multi-Channel Dispatch**: Respects all messaging channels enabled in Settings (WhatsApp Cloud API, Fast2SMS, and Personal Phone 1-tap), dispatching notifications across all active gateways simultaneously.
+- Photo attachment support with client-side image compression.
 
 ### 7. Multi-Channel Messaging & Usage Trackers
 - Independent side-by-side trackers:
@@ -112,10 +113,13 @@ In India and many parts of the world, households order daily milk and provisions
 - **Built-in Webhook Simulator Console** for testing vendor delivery callbacks without live credentials.
 
 ### 8. Settings & Security
+- **Authentication & Privacy Enhancements**:
+  - Show/Hide password toggle on login screen.
+  - Autofill and credential pre-filling strictly disabled so fields load empty on shared/borrowed computers.
 - **Web Browser Session Auto-Expiry**: Closing the browser/tab or 60 minutes of inactivity requires admin re-authentication on shared computers, while trusted installed PWA/Android devices enjoy seamless persistent sessions.
 - **5-Month Realistic Sample Data Seeder**: Pre-loaded database generator covering June through October 2026 across 3 vendors (Ramesh Patil Dairy, Kisan Fresh Groceries, Amul Country Fresh) with a varied mix of statuses (Pending, Confirmed, Auto-Confirmed, Denied, Absent). Accessible via 1-click in Settings and `/api/admin/seed`.
 - One-click language switcher: **English**, **Hindi (हिंदी)**, **Marathi (मराठी)**.
-- **Downloadable Android App**: One-click download of `mitra-v0.1.apk` + PWA Home Screen installation.
+- **Genuine Android APK Release**: Downloadable `mitra-v0.2.apk` (~7.3 MB) with genuine binary manifest, dex bytecode, and release signing, plus browser-native PWA Home Screen installation.
 - **Messaging Channels Multi-Select**: Enable or disable any combination of WhatsApp, Fast2SMS, and Personal Phone channels.
 - **MongoDB Atlas Backup Status**: Real-time cluster health check and connection latency monitor.
 - Storage cleanup job (pruning photos older than 30 days while permanently preserving ledger rows).

@@ -323,15 +323,15 @@ export default function SettingsPage() {
 
               <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                 <a
-                  href="/downloads/mitra-v0.1.apk"
-                  download="mitra-v0.1.apk"
+                  href="/downloads/mitra-v0.2.apk"
+                  download="mitra-v0.2.apk"
                   className="btn-primary"
                   style={{
                     width: '100%',
                     background: '#183d2d',
                     borderColor: '#183d2d',
                     fontSize: '0.82rem',
-                    padding: '0.45rem 0.85rem',
+                    padding: '0.5rem 0.85rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -342,7 +342,7 @@ export default function SettingsPage() {
                   id="btn-download-apk-direct"
                 >
                   <Download size={14} />
-                  <span>Download Mitra APK (v0.1)</span>
+                  <span>Download Mitra APK (version 0.2 • 7.3 MB)</span>
                 </a>
 
                 <button
@@ -352,7 +352,7 @@ export default function SettingsPage() {
                   style={{
                     width: '100%',
                     fontSize: '0.78rem',
-                    padding: '0.4rem 0.85rem',
+                    padding: '0.45rem 0.85rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -361,7 +361,7 @@ export default function SettingsPage() {
                   id="btn-install-android"
                 >
                   <Smartphone size={13} />
-                  <span>{isInstalled ? 'Web App Installed' : 'Install Instant PWA'}</span>
+                  <span>{isInstalled ? 'Web App Installed' : 'Install PWA (Direct to Home Screen)'}</span>
                 </button>
               </div>
             </div>
