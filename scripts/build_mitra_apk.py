@@ -345,23 +345,27 @@ def main():
         ]
         subprocess.check_call(cmd_gen)
 
-    print('[Mitra APK Builder] Signing APK with jarsigner (SHA256withRSA)...')
+    uber_signer = 'scripts/uber-apk-signer.jar'
+    java_exe = os.path.join(jre_bin, 'java.exe')
+
+    print('[Mitra APK Builder] ZipAligning and Signing APK with uber-apk-signer (v1, v2, v3 schemes)...')
     shutil.copyfile(out_apk_unsigned, out_apk_signed)
     cmd_sign = [
-        jarsigner,
-        '-verbose',
-        '-sigalg', 'SHA256withRSA',
-        '-digestalg', 'SHA-256',
-        '-keystore', keystore,
-        '-storepass', storepass,
-        '-keypass', storepass,
-        out_apk_signed,
-        alias
+        java_exe,
+        '-jar', uber_signer,
+        '-a', out_apk_signed,
+        '--ks', keystore,
+        '--ksAlias', alias,
+        '--ksPass', storepass,
+        '--ksKeyPass', storepass,
+        '--allowResign',
+        '--overwrite',
+        '--verbose'
     ]
     subprocess.check_call(cmd_sign)
 
-    print('[Mitra APK Builder] Verifying APK signature...')
-    cmd_verify = [jarsigner, '-verify', out_apk_signed]
+    print('[Mitra APK Builder] Verifying APK signature and zipalign...')
+    cmd_verify = [java_exe, '-jar', uber_signer, '-y', '-a', out_apk_signed]
     subprocess.check_call(cmd_verify)
 
     # Copy to v0.1 as well
