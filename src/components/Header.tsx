@@ -24,6 +24,43 @@ export const Header: React.FC = () => {
   const pathname = usePathname();
   const { t, language, setLanguage, logoutAdmin, isAdminLoggedIn, household } = useMitra();
 
+  // Point 35: On login page or unauthenticated state, render minimal pre-login header (no nav items)
+  if (pathname === '/login' || (!isAdminLoggedIn && !pathname.startsWith('/v/'))) {
+    return (
+      <header className="mitra-header" id="mitra-login-header">
+        <div className="brand-wrapper">
+          <div className="brand-logo-bottle" style={{ background: '#183d2d', borderRadius: '12px' }}>
+            <MilkBottleIcon size={24} fillColor="#ffffff" />
+          </div>
+          <div className="brand-title-group">
+            <h1 style={{ fontSize: '1.25rem', lineHeight: '1.15', fontWeight: 800, color: '#183d2d', letterSpacing: '-0.02em', background: 'none', WebkitTextFillColor: 'initial' }}>
+              Mitra
+            </h1>
+            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
+              Delivery Confirmation Platform
+            </span>
+          </div>
+        </div>
+        <div className="header-actions">
+          <div className="lang-selector" title="Change Language" style={{ borderRadius: '10px' }}>
+            <Globe size={14} color="#183d2d" />
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as Language)}
+              aria-label="Select Language"
+              id="login-lang-select"
+              style={{ color: '#183d2d', fontWeight: 600 }}
+            >
+              <option value="en">English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="mr">मराठी (Marathi)</option>
+            </select>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   // If viewing the vendor portal (/v/...), render a streamlined header
   if (pathname.startsWith('/v/')) {
     return (

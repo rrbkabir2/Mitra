@@ -48,22 +48,52 @@ export const WEB_SESSION_ACTIVE_KEY = 'mitra_web_session_active';
 export const WEB_SESSION_LAST_ACTIVE_KEY = 'mitra_web_last_active';
 export const WEB_INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes inactivity expiry
 
+export const MITRA_APP_STORAGE_KEY = 'mitra_installed_app';
+export const MITRA_PERSISTENT_AUTH_KEY = 'mitra_auth_token_persistent';
+
 /**
  * Checks if the application is running in an installed mobile app or PWA standalone window.
- * Requirement 21: Installed Android APK / PWA is a trusted personal environment that may stay
- * logged in longer, whereas standard web browsers must expire upon close or inactivity.
+ * Requirement 21 & Point 34: Installed Android APK / PWA is a trusted personal environment that stays
+ * signed in long-term (e.g. 180 days), whereas standard web browsers must expire upon close or 60 min inactivity.
  */
 export function isInstalledMobileOrPWA(): boolean {
   if (typeof window === 'undefined') return false;
   try {
+    // 1. Check previous persistent flag in localStorage
+    if (localStorage.getItem(MITRA_APP_STORAGE_KEY) === 'true' || localStorage.getItem('mitra_pwa_mode') === 'true') {
+      return true;
+    }
+
+    // 2. Android WebView native JS interface
+    const hasAndroidProxy = Boolean((window as unknown as { androidAppProxy?: unknown }).androidAppProxy);
+
+    // 3. User agent detection for Android WebView / PWA / TWA
+    const ua = navigator.userAgent || '';
+    const isWebView =
+      ua.includes('; wv') ||
+      ua.includes('Version/4.0 Chrome/') ||
+      (ua.includes('Android') && (ua.includes('wv') || ua.includes('Mobile/')));
+
+    // 4. Standalone window mode (PWA / Installed web app)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     const isIOSStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    const isAndroidApp =
-      document.referrer?.startsWith('android-app://') ||
-      window.location.search.includes('platform=pwa') ||
-      window.location.search.includes('standalone=true') ||
-      localStorage.getItem('mitra_pwa_mode') === 'true';
-    return Boolean(isStandalone || isIOSStandalone || isAndroidApp);
+
+    // 5. Explicit launch parameters or referrer
+    const search = window.location.search || '';
+    const isParam =
+      search.includes('platform=android_app') ||
+      search.includes('platform=pwa') ||
+      search.includes('standalone=true') ||
+      search.includes('is_app=true') ||
+      Boolean(document.referrer?.startsWith('android-app://'));
+
+    const isInstalled = Boolean(hasAndroidProxy || isWebView || isStandalone || isIOSStandalone || isParam);
+    if (isInstalled) {
+      try {
+        localStorage.setItem(MITRA_APP_STORAGE_KEY, 'true');
+      } catch {}
+    }
+    return isInstalled;
   } catch {
     return false;
   }
@@ -72,8 +102,8 @@ export function isInstalledMobileOrPWA(): boolean {
 /**
  * Client-side session cookie helpers
  * On Web: Sets a true session cookie (no expires/Max-Age) + sessionStorage token,
- * so closing Chrome/browser tab or 60 min inactivity terminates the session.
- * On Installed Mobile / PWA: Sets a persistent 30-day cookie for typical mobile app persistence.
+ * so closing Chrome/browser tab or 60 min inactivity terminates the session (Point 21).
+ * On Installed Mobile / PWA: Sets a persistent 180-day cookie + localStorage token for rock-solid mobile persistence (Point 34).
  */
 export function setClientAuthCookie(email: string, forcePersistent?: boolean) {
   if (typeof document === 'undefined') return;
@@ -81,12 +111,15 @@ export function setClientAuthCookie(email: string, forcePersistent?: boolean) {
   const isTrustedApp = isInstalledMobileOrPWA() || forcePersistent;
 
   if (isTrustedApp) {
-    // 30 days persistent cookie for trusted mobile device
-    const expiryDays = 30;
+    // 180 days persistent cookie for trusted mobile device (Point 34)
+    const expiryDays = 180;
     const date = new Date();
     date.setTime(date.getTime() + expiryDays * 24 * 60 * 60 * 1000);
     const expires = `expires=${date.toUTCString()}`;
     document.cookie = `${MITRA_AUTH_COOKIE_NAME}=${encodeURIComponent(email)}; ${expires}; path=/; SameSite=Lax`;
+    try {
+      localStorage.setItem(MITRA_PERSISTENT_AUTH_KEY, encodeURIComponent(email));
+    } catch {}
   } else {
     // Session cookie: omitted expires & max-age forces browser to discard cookie on session close
     document.cookie = `${MITRA_AUTH_COOKIE_NAME}=${encodeURIComponent(email)}; path=/; SameSite=Lax`;
@@ -145,6 +178,7 @@ export function clearClientAuthCookie() {
   try {
     sessionStorage.removeItem(WEB_SESSION_ACTIVE_KEY);
     sessionStorage.removeItem(WEB_SESSION_LAST_ACTIVE_KEY);
+    localStorage.removeItem(MITRA_PERSISTENT_AUTH_KEY);
   } catch {}
 }
 
@@ -164,6 +198,19 @@ export function getClientAuthCookie(): string | null {
         }
       }
     }
+
+    // Point 34 fallback for installed mobile app / PWA: if cookie is absent, check persistent storage
+    if (isInstalledMobileOrPWA()) {
+      const stored = localStorage.getItem(MITRA_PERSISTENT_AUTH_KEY);
+      if (stored) {
+        try {
+          const decoded = decodeURIComponent(stored);
+          setClientAuthCookie(decoded, true);
+          return decoded;
+        } catch {}
+      }
+    }
+
     return null;
   } catch {
     return null;

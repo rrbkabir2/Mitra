@@ -21,6 +21,7 @@ import {
   X,
   CheckCircle2,
   Sliders,
+  Share2,
 } from 'lucide-react';
 
 export default function ReportsPage() {
@@ -37,6 +38,9 @@ export default function ReportsPage() {
   const today = new Date();
   const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
+  // Point 45: Monthly Report Language Selection (Hindi, English, Marathi)
+  const [reportLang, setReportLang] = useState<'en' | 'hi' | 'mr'>('en');
+  const [reportVendorId, setReportVendorId] = useState<string>('all');
   const [copiedInvoice, setCopiedInvoice] = useState<boolean>(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState<boolean>(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
@@ -54,8 +58,10 @@ export default function ReportsPage() {
     targetState: false,
   });
 
-  // Filter entries for selected month
-  const monthEntries = entries.filter((e) => e.entry_date.startsWith(selectedMonth));
+  // Filter entries for selected month and vendor
+  const monthEntries = entries
+    .filter((e) => e.entry_date.startsWith(selectedMonth))
+    .filter((e) => reportVendorId === 'all' || e.vendor_id === reportVendorId);
 
   // Compute metrics (Point 8: properly accounting for auto-confirmed entries)
   const totalLitres = monthEntries.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
@@ -67,69 +73,181 @@ export default function ReportsPage() {
   const pendingCount = monthEntries.filter((e) => e.status === 'pending').length;
   const absentCount = monthEntries.filter((e) => e.status === 'absent').length;
 
-  const dairyVendor = vendors.find((v) => v.vendor_type === 'dairy') || vendors[0];
+  const currentVendor = reportVendorId !== 'all' 
+    ? vendors.find((v) => v.id === reportVendorId) 
+    : (vendors.find((v) => v.vendor_type === 'dairy') || vendors[0]);
+  const dairyVendor = currentVendor;
 
   // Number of vendors with auto-report enabled
   const enabledVendorsCount = vendors.filter((v) => v.auto_monthly_report !== false).length;
 
-  // Plain Text Invoice Generator
-  const generatePlainTextInvoice = (): string => {
+  // Point 45: Multi-lingual Plain Text Invoice Generator (Hindi, English, Marathi)
+  const generatePlainTextInvoice = (lang: 'en' | 'hi' | 'mr' = reportLang): string => {
     const lines: string[] = [];
-    lines.push(`=======================================================`);
-    lines.push(`               MITRA MONTHLY STATEMENT                 `);
-    lines.push(`=======================================================`);
-    lines.push(`Household: ${household.name}`);
-    lines.push(`Vendor:    ${dairyVendor?.name || 'Dairy Provider'} (${dairyVendor?.phone_number || ''})`);
-    lines.push(`Month:     ${selectedMonth}`);
-    lines.push(`Generated: ${new Date().toLocaleString()}`);
-    lines.push(`-------------------------------------------------------`);
-    lines.push(`Date       Qty (L)   Rate (₹)  Total (₹)   Status`);
-    lines.push(`-------------------------------------------------------`);
+    const vName = reportVendorId === 'all' ? 'All Household Vendors' : (currentVendor?.name || 'Dairy Provider');
+    const vPhone = reportVendorId === 'all' ? '' : ` (${currentVendor?.phone_number || ''})`;
 
-    monthEntries
-      .sort((a, b) => (a.entry_date > b.entry_date ? 1 : -1))
-      .forEach((entry) => {
-        const dateStr = entry.entry_date.padEnd(11, ' ');
-        const qtyStr = String(entry.quantity).padEnd(10, ' ');
-        const rateStr = String(entry.unit_price).padEnd(10, ' ');
-        const totalStr = String(entry.total_price).padEnd(12, ' ');
-        const statusLabel =
-          entry.status === 'auto-confirmed'
-            ? 'auto-confirmed'
-            : entry.status === 'confirmed'
-            ? 'confirmed'
-            : entry.status;
-        lines.push(`${dateStr}${qtyStr}${rateStr}${totalStr}${statusLabel}`);
-      });
+    if (lang === 'hi') {
+      lines.push(`=======================================================`);
+      lines.push(`               मित्र मासिक वितरण विवरण (INVOICE)          `);
+      lines.push(`=======================================================`);
+      lines.push(`परिवार:   ${household.name}`);
+      lines.push(`विक्रेता: ${vName}${vPhone}`);
+      lines.push(`महीना:    ${selectedMonth}`);
+      lines.push(`दिनांक:   ${new Date().toLocaleString('hi-IN')}`);
+      lines.push(`-------------------------------------------------------`);
+      lines.push(`दिनांक      मात्रा (L)   दर (₹)    कुल (₹)    स्थिति`);
+      lines.push(`-------------------------------------------------------`);
 
-    lines.push(`-------------------------------------------------------`);
-    lines.push(`TOTAL DELIVERED:   ${totalLitres.toFixed(1)} Litres`);
-    lines.push(`TOTAL PAYABLE:     ₹${totalAmount.toLocaleString()}`);
-    lines.push(`VENDOR CONFIRMED:  ${vendorConfirmedCount} entries`);
-    lines.push(`AUTO CONFIRMED:    ${autoConfirmedCount} entries (24h system auto)`);
-    lines.push(`PENDING / ABSENT:  ${pendingCount} pending, ${absentCount} absent`);
-    lines.push(`=======================================================`);
-    lines.push(`Tamper-proof auditable records verified by Mitra Platform.`);
+      monthEntries
+        .sort((a, b) => (a.entry_date > b.entry_date ? 1 : -1))
+        .forEach((entry) => {
+          const dateStr = entry.entry_date.padEnd(12, ' ');
+          const qtyStr = String(entry.quantity).padEnd(12, ' ');
+          const rateStr = String(entry.unit_price).padEnd(10, ' ');
+          const totalStr = String(entry.total_price).padEnd(12, ' ');
+          const statusLabel =
+            entry.status === 'auto-confirmed'
+              ? 'स्वतः-पुष्टीकृत (सिस्टम)'
+              : entry.status === 'confirmed'
+              ? 'पुष्टीकृत (विक्रेता)'
+              : entry.status === 'absent'
+              ? 'अनुपस्थित'
+              : 'लंबित';
+          lines.push(`${dateStr}${qtyStr}${rateStr}${totalStr}${statusLabel}`);
+        });
+
+      lines.push(`-------------------------------------------------------`);
+      lines.push(`कुल वितरित मात्रा:  ${totalLitres.toFixed(1)} लीटर`);
+      lines.push(`कुल देय राशि:      ₹${totalAmount.toLocaleString()}`);
+      lines.push(`विक्रेता द्वारा पुष्ट: ${vendorConfirmedCount} प्रविष्टियाँ`);
+      lines.push(`सिस्टम द्वारा स्वतः-पुष्ट: ${autoConfirmedCount} प्रविष्टियाँ (24 घंटे स्वतः)`);
+      lines.push(`लंबित / अनुपस्थित: ${pendingCount} लंबित, ${absentCount} अनुपस्थित`);
+      lines.push(`=======================================================`);
+      lines.push(`मित्रा डिलीवरी पुष्टिकरण प्लेटफॉर्म द्वारा सत्यापित स्थायी रिकॉर्ड।`);
+    } else if (lang === 'mr') {
+      lines.push(`=======================================================`);
+      lines.push(`               मित्र मासिक वितरण विवरण (INVOICE)          `);
+      lines.push(`=======================================================`);
+      lines.push(`कुटुंब:   ${household.name}`);
+      lines.push(`विक्रेता: ${vName}${vPhone}`);
+      lines.push(`महिना:    ${selectedMonth}`);
+      lines.push(`तारीख:    ${new Date().toLocaleString('mr-IN')}`);
+      lines.push(`-------------------------------------------------------`);
+      lines.push(`तारीख       प्रमाण (L)   दर (₹)    एकूण (₹)   स्थिती`);
+      lines.push(`-------------------------------------------------------`);
+
+      monthEntries
+        .sort((a, b) => (a.entry_date > b.entry_date ? 1 : -1))
+        .forEach((entry) => {
+          const dateStr = entry.entry_date.padEnd(12, ' ');
+          const qtyStr = String(entry.quantity).padEnd(12, ' ');
+          const rateStr = String(entry.unit_price).padEnd(10, ' ');
+          const totalStr = String(entry.total_price).padEnd(12, ' ');
+          const statusLabel =
+            entry.status === 'auto-confirmed'
+              ? 'स्वयंचलित (प्रणाली)'
+              : entry.status === 'confirmed'
+              ? 'निश्चित (विक्रेता)'
+              : entry.status === 'absent'
+              ? 'गैरहजर'
+              : 'प्रलंबित';
+          lines.push(`${dateStr}${qtyStr}${rateStr}${totalStr}${statusLabel}`);
+        });
+
+      lines.push(`-------------------------------------------------------`);
+      lines.push(`एकूण वितरित दूध:    ${totalLitres.toFixed(1)} लिटर`);
+      lines.push(`एकूण देय रक्कम:     ₹${totalAmount.toLocaleString()}`);
+      lines.push(`विक्रेत्याने पुष्टी केली: ${vendorConfirmedCount} नोंदी`);
+      lines.push(`प्रणाली स्वयंचलित पुष्टी: ${autoConfirmedCount} नोंदी (24 तास प्रणाली)`);
+      lines.push(`प्रलंबित / गैरहजर: ${pendingCount} प्रलंबित, ${absentCount} गैरहजर`);
+      lines.push(`=======================================================`);
+      lines.push(`मित्र डिलिव्हरी पुष्टीकरण प्लॅटफॉर्मद्वारे सत्यापित अपरिवर्तनीय नोंदी.`);
+    } else {
+      // English default
+      lines.push(`=======================================================`);
+      lines.push(`               MITRA MONTHLY STATEMENT                 `);
+      lines.push(`=======================================================`);
+      lines.push(`Household: ${household.name}`);
+      lines.push(`Vendor:    ${vName}${vPhone}`);
+      lines.push(`Month:     ${selectedMonth}`);
+      lines.push(`Generated: ${new Date().toLocaleString()}`);
+      lines.push(`-------------------------------------------------------`);
+      lines.push(`Date       Qty (L)   Rate (₹)  Total (₹)   Status`);
+      lines.push(`-------------------------------------------------------`);
+
+      monthEntries
+        .sort((a, b) => (a.entry_date > b.entry_date ? 1 : -1))
+        .forEach((entry) => {
+          const dateStr = entry.entry_date.padEnd(11, ' ');
+          const qtyStr = String(entry.quantity).padEnd(10, ' ');
+          const rateStr = String(entry.unit_price).padEnd(10, ' ');
+          const totalStr = String(entry.total_price).padEnd(12, ' ');
+          const statusLabel =
+            entry.status === 'auto-confirmed'
+              ? 'auto-confirmed'
+              : entry.status === 'confirmed'
+              ? 'confirmed'
+              : entry.status === 'absent'
+              ? 'absent'
+              : 'pending';
+          lines.push(`${dateStr}${qtyStr}${rateStr}${totalStr}${statusLabel}`);
+        });
+
+      lines.push(`-------------------------------------------------------`);
+      lines.push(`TOTAL DELIVERED:   ${totalLitres.toFixed(1)} Litres`);
+      lines.push(`TOTAL PAYABLE:     ₹${totalAmount.toLocaleString()}`);
+      lines.push(`VENDOR CONFIRMED:  ${vendorConfirmedCount} entries`);
+      lines.push(`AUTO CONFIRMED:    ${autoConfirmedCount} entries (24h system auto)`);
+      lines.push(`PENDING / ABSENT:  ${pendingCount} pending, ${absentCount} absent`);
+      lines.push(`=======================================================`);
+      lines.push(`Tamper-proof auditable records verified by Mitra Platform.`);
+    }
+
     return lines.join('\n');
   };
 
+  // Requirement 46: Reliable download handling across Android WebView and Browsers
   const handlePrintPdf = () => {
-    window.print();
+    const vParam = encodeURIComponent(reportVendorId === 'all' ? 'All Vendors' : (currentVendor?.name || 'Dairy Provider'));
+    const printUrl = `/api/reports/download?month=${selectedMonth}&lang=${reportLang}&vendor=${vParam}&format=html&autoPrint=true`;
+    if (typeof window !== 'undefined') {
+      window.open(printUrl, '_blank');
+    }
   };
 
   const handleDownloadTxt = () => {
-    const text = generatePlainTextInvoice();
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Mitra_Statement_${household.name.replace(/\s+/g, '_')}_${selectedMonth}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const vParam = encodeURIComponent(reportVendorId === 'all' ? 'All Vendors' : (currentVendor?.name || 'Dairy Provider'));
+    // Trigger download via API endpoint which activates Android Download Manager in WebView
+    const downloadUrl = `/api/reports/download?month=${selectedMonth}&lang=${reportLang}&vendor=${vParam}&format=txt`;
+    if (typeof window !== 'undefined') {
+      window.location.href = downloadUrl;
+    }
+  };
+
+  const handleShareInvoice = async () => {
+    const text = generatePlainTextInvoice(reportLang);
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `Mitra Statement ${selectedMonth}`,
+          text: text,
+        });
+      } catch {
+        // Fallback to clipboard
+        navigator.clipboard.writeText(text);
+        setCopiedInvoice(true);
+        setTimeout(() => setCopiedInvoice(false), 3000);
+      }
+    } else {
+      navigator.clipboard.writeText(text);
+      setCopiedInvoice(true);
+      setTimeout(() => setCopiedInvoice(false), 3000);
+    }
   };
 
   const handleCopyInvoice = () => {
-    const text = generatePlainTextInvoice();
+    const text = generatePlainTextInvoice(reportLang);
     navigator.clipboard.writeText(text);
     setCopiedInvoice(true);
     setTimeout(() => setCopiedInvoice(false), 3000);
@@ -241,14 +359,41 @@ export default function ReportsPage() {
             <span style={{ fontSize: '0.95rem', fontWeight: 700 }}>Select Billing Cycle:</span>
           </div>
 
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="form-input"
-            style={{ width: 'auto', padding: '0.45rem 0.85rem', fontWeight: 700 }}
-            id="select-billing-month"
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <label htmlFor="select-report-vendor" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                Vendor:
+              </label>
+              <select
+                value={reportVendorId}
+                onChange={(e) => setReportVendorId(e.target.value)}
+                className="form-select"
+                style={{ width: 'auto', minWidth: '180px', padding: '0.45rem 0.85rem', fontWeight: 600, fontSize: '0.84rem' }}
+                id="select-report-vendor"
+              >
+                <option value="all">All Vendors (Combined)</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} ({v.vendor_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <label htmlFor="select-billing-month" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                Month:
+              </label>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="form-input"
+                style={{ width: 'auto', padding: '0.45rem 0.85rem', fontWeight: 700 }}
+                id="select-billing-month"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -475,49 +620,98 @@ export default function ReportsPage() {
         className="btn-print-hide"
         style={{
           display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
+          flexDirection: 'column',
+          gap: '0.85rem',
           marginBottom: '1.5rem',
+          background: '#ffffff',
+          border: '1px solid var(--border-glass)',
+          borderRadius: 'var(--radius-md)',
+          padding: '1rem',
         }}
       >
-        <button
-          type="button"
-          onClick={handlePrintPdf}
-          className="btn-secondary"
-          id="btn-print-report"
-        >
-          <Printer size={16} />
-          <span>{t.reports.downloadPdf}</span>
-        </button>
+        {/* Point 45: Monthly Report Language Selection (Hindi, English, Marathi) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
+            Report Content Language:
+          </span>
+          <div className="filter-pill-group" role="tablist">
+            <button
+              type="button"
+              className={`filter-pill-btn ${reportLang === 'en' ? 'active' : ''}`}
+              onClick={() => setReportLang('en')}
+              id="btn-report-lang-en"
+            >
+              English
+            </button>
+            <button
+              type="button"
+              className={`filter-pill-btn ${reportLang === 'hi' ? 'active' : ''}`}
+              onClick={() => setReportLang('hi')}
+              id="btn-report-lang-hi"
+            >
+              हिन्दी (Hindi)
+            </button>
+            <button
+              type="button"
+              className={`filter-pill-btn ${reportLang === 'mr' ? 'active' : ''}`}
+              onClick={() => setReportLang('mr')}
+              id="btn-report-lang-mr"
+            >
+              मराठी (Marathi)
+            </button>
+          </div>
+        </div>
 
-        <button
-          type="button"
-          onClick={handleDownloadTxt}
-          className="btn-secondary"
-          id="btn-download-txt-report"
-        >
-          <Download size={16} />
-          <span>{t.reports.downloadTxt}</span>
-        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={handlePrintPdf}
+            className="btn-secondary"
+            id="btn-print-report"
+          >
+            <Printer size={16} />
+            <span>{t.reports.downloadPdf}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={handleCopyInvoice}
-          className="btn-secondary"
-          id="btn-copy-invoice-text"
-        >
-          {copiedInvoice ? (
-            <>
-              <Check size={16} color="#059669" />
-              <span>{t.reports.invoiceCopied}</span>
-            </>
-          ) : (
-            <>
-              <Copy size={16} />
-              <span>{t.reports.copyInvoice}</span>
-            </>
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={handleDownloadTxt}
+            className="btn-secondary"
+            id="btn-download-txt-report"
+          >
+            <Download size={16} />
+            <span>{t.reports.downloadTxt}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleShareInvoice}
+            className="btn-secondary"
+            id="btn-share-report"
+            title="Share or save to device"
+          >
+            <Share2 size={16} />
+            <span>Share / Save</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopyInvoice}
+            className="btn-secondary"
+            id="btn-copy-invoice-text"
+          >
+            {copiedInvoice ? (
+              <>
+                <Check size={16} color="#059669" />
+                <span>{t.reports.invoiceCopied}</span>
+              </>
+            ) : (
+              <>
+                <Copy size={16} />
+                <span>{t.reports.copyInvoice}</span>
+              </>
+            )}
+          </button>
 
         <button
           type="button"
@@ -530,6 +724,7 @@ export default function ReportsPage() {
           <Send size={16} />
           <span>{isSendingWhatsApp ? 'Sending...' : 'Send Bill to Vendor WhatsApp'}</span>
         </button>
+        </div>
       </div>
 
       {/* Printable Invoice / Statement Sheet */}

@@ -396,19 +396,11 @@ export default function HistoryPage() {
               </button>
               <button
                 type="button"
-                className={`filter-pill-btn ${deliveryFilter === 'all' ? 'active' : ''}`}
+                className={`filter-pill-btn ${(deliveryFilter === 'all' || (deliveryFilter as string) === 'ledger') ? 'active' : ''}`}
                 onClick={() => setDeliveryFilter('all')}
                 id="btn-history-filter-all"
               >
-                All
-              </button>
-              <button
-                type="button"
-                className={`filter-pill-btn ${deliveryFilter === 'ledger' ? 'active' : ''}`}
-                onClick={() => setDeliveryFilter('ledger')}
-                id="btn-history-filter-ledger"
-              >
-                <Eye size={13} style={{ marginRight: '3px' }} /> Full Ledger
+                <Eye size={13} style={{ marginRight: '3px' }} /> Full Ledger (All)
               </button>
             </div>
 

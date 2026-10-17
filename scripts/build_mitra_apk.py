@@ -1,359 +1,121 @@
 import os
 import sys
-import zipfile
-import struct
-import json
-import subprocess
 import shutil
+import subprocess
+import re
+import json
+import urllib.request
+import zipfile
 from PIL import Image
 
-def rebuild_arsc(arsc_data):
-    header_type, header_size, total_size = struct.unpack('<HHI', arsc_data[:8])
-    sp_offset = 12
-    sp_type, sp_header_size, sp_size = struct.unpack('<HHI', arsc_data[sp_offset:sp_offset+8])
-    sp_string_count, sp_style_count, sp_flags, sp_strings_start, sp_styles_start = struct.unpack('<IIIII', arsc_data[sp_offset+8:sp_offset+28])
-    orig_offsets = struct.unpack(f'<{sp_string_count}I', arsc_data[sp_offset+28:sp_offset+28+sp_string_count*4])
-    pool_data = arsc_data[sp_offset + sp_strings_start:sp_offset + (sp_styles_start if sp_style_count > 0 else sp_size)]
+def find_java():
+    # 1. Try PATH
+    j = shutil.which('java')
+    if j:
+        return j
+    # 2. Tableau JRE known path
+    tableau_java = r'C:\Program Files\Tableau\Tableau Public 2026.2\bin\jre\bin\java.exe'
+    if os.path.exists(tableau_java):
+        return tableau_java
+    # 3. Standard JRE / JDK paths
+    for p in [r'C:\Program Files\Java', r'C:\Program Files (x86)\Java']:
+        if os.path.exists(p):
+            for root, dirs, files in os.walk(p):
+                if 'java.exe' in files:
+                    return os.path.join(root, 'java.exe')
+    return 'java'
 
-    strings = []
-    for off in orig_offsets:
-        u16len = pool_data[off]; p = off + (1 if u16len < 128 else 2)
-        u8len = pool_data[p]; p += (1 if u8len < 128 else 2)
-        strings.append(pool_data[p:p+u8len].decode('utf-8', errors='ignore'))
+def ensure_tools():
+    tools_dir = os.path.abspath('scripts/tools')
+    os.makedirs(tools_dir, exist_ok=True)
+    
+    # AAPT2
+    aapt2_exe = os.path.join(tools_dir, 'aapt2.exe')
+    if not os.path.exists(aapt2_exe):
+        print('[Mitra APK Builder] Downloading official Google AAPT2 binary...')
+        url = 'https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2/8.2.2-10154469/aapt2-8.2.2-10154469-windows.jar'
+        jar_path = os.path.join(tools_dir, 'aapt2-windows.jar')
+        urllib.request.urlretrieve(url, jar_path)
+        with zipfile.ZipFile(jar_path, 'r') as z:
+            z.extract('aapt2.exe', tools_dir)
+        print('[Mitra APK Builder] Extracted aapt2.exe.')
 
-    for i in range(len(strings)):
-        if 'my webview' in strings[i].lower():
-            print(f'Replacing arsc string {i}: "{strings[i]}" -> "Mitra"')
-            strings[i] = 'Mitra'
+    # Apktool
+    apktool_jar = os.path.join(tools_dir, 'apktool.jar')
+    if not os.path.exists(apktool_jar):
+        print('[Mitra APK Builder] Downloading Apktool 2.10.0...')
+        url = 'https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar'
+        urllib.request.urlretrieve(url, apktool_jar)
+        print('[Mitra APK Builder] Downloaded apktool.jar.')
 
-    new_pool_data = bytearray()
-    new_offsets = []
-    for s in strings:
-        new_offsets.append(len(new_pool_data))
-        encoded = s.encode('utf-8')
-        u16len = len(s)
-        u8len = len(encoded)
-        if u16len < 128:
-            new_pool_data.append(u16len)
+    # Platform-tools (ADB)
+    adb_exe = os.path.join(tools_dir, 'platform-tools', 'adb.exe')
+    if not os.path.exists(adb_exe):
+        print('[Mitra APK Builder] Downloading official Android platform-tools...')
+        url = 'https://dl.google.com/android/repository/platform-tools-latest-windows.zip'
+        zip_path = os.path.join(tools_dir, 'platform-tools.zip')
+        urllib.request.urlretrieve(url, zip_path)
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            z.extractall(tools_dir)
+        print('[Mitra APK Builder] Extracted platform-tools (adb.exe).')
+
+    return aapt2_exe, apktool_jar, adb_exe
+
+def render_all_icons():
+    from render_icons import main as render_main
+    print('[Mitra APK Builder] Rendering crystal-clear Mitra milk-bottle icons across all densities...')
+    render_main()
+
+def prepare_apk_source(apktool_jar, java_exe):
+    base_apk = 'scripts/original_base.apk'
+    src_dir = 'scripts/apk_src'
+    
+    # If base apk doesn't exist, check git or downloads
+    if not os.path.exists(base_apk):
+        print('[Mitra APK Builder] Extracting base APK from repository history...')
+        proc = subprocess.run(['git', 'show', '20804cf:public/downloads/mitra-v0.2.apk'], capture_output=True)
+        if len(proc.stdout) > 1000000:
+            with open(base_apk, 'wb') as f:
+                f.write(proc.stdout)
         else:
-            new_pool_data.append(0x80 | ((u16len >> 8) & 0x7f))
-            new_pool_data.append(u16len & 0xff)
-        if u8len < 128:
-            new_pool_data.append(u8len)
-        else:
-            new_pool_data.append(0x80 | ((u8len >> 8) & 0x7f))
-            new_pool_data.append(u8len & 0xff)
-        new_pool_data.extend(encoded)
-        new_pool_data.append(0)
+            raise RuntimeError('Could not locate original base APK.')
 
-    while len(new_pool_data) % 4 != 0:
-        new_pool_data.append(0)
+    # If apk_src is missing or corrupted, decompile
+    manifest_path = os.path.join(src_dir, 'AndroidManifest.xml')
+    if not os.path.exists(manifest_path):
+        print(f'[Mitra APK Builder] Decompiling {base_apk} with Apktool...')
+        subprocess.check_call([java_exe, '-jar', apktool_jar, 'd', base_apk, '-o', src_dir, '-f'])
 
-    offsets_bytes = struct.pack(f'<{len(new_offsets)}I', *new_offsets)
-    new_strings_start = 28 + len(offsets_bytes)
-    new_styles_start = 0
-    new_chunk_size = 28 + len(offsets_bytes) + len(new_pool_data)
+    # Apply all branding and density icons
+    from setup_apk_resources import setup_resources
+    setup_resources()
 
-    new_sp_header = struct.pack('<HHI', sp_type, sp_header_size, new_chunk_size)
-    new_sp_meta = struct.pack('<IIIII', sp_string_count, sp_style_count, sp_flags, new_strings_start, new_styles_start)
-
-    new_sp = new_sp_header + new_sp_meta + offsets_bytes + new_pool_data
-    rest_of_arsc = bytearray(arsc_data[sp_offset + sp_size:])
-
-    # Replace launcher background color 0xff008577 (b'\x77\x85\x00\xff') with 0xff183d2d (b'\x2d\x3d\x18\xff')
-    old_color = b'\x77\x85\x00\xff'
-    new_color = b'\x2d\x3d\x18\xff'
-    color_idx = rest_of_arsc.find(old_color)
-    if color_idx != -1:
-        print(f'Replaced background color at rest offset {color_idx}')
-        rest_of_arsc[color_idx:color_idx+4] = new_color
-
-    new_total_size = 12 + len(new_sp) + len(rest_of_arsc)
-    new_header = struct.pack('<HHI', header_type, header_size, new_total_size) + arsc_data[8:12]
-
-    return bytes(new_header + new_sp + rest_of_arsc)
-
-def rebuild_qr_xml(data):
-    # VectorDrawable AXML
-    offset = 8
-    sp_tag, sp_size, sp_string_count, sp_style_count, sp_flags, sp_strings_start, sp_styles_start = struct.unpack('<IIIIIII', data[offset:offset+28])
-    offsets = struct.unpack(f'<{sp_string_count}I', data[offset+28:offset+28+sp_string_count*4])
-    pdata = data[offset+sp_strings_start:offset+sp_size]
-
-    strings = []
-    for off in offsets:
-        if sp_flags & (1 << 8):
-            u16 = pdata[off]; p = off + (1 if u16 < 128 else 2)
-            u8 = pdata[p]; p += (1 if u8 < 128 else 2)
-            strings.append(pdata[p:p+u8].decode('utf-8', errors='ignore'))
-        else:
-            u16 = struct.unpack('<H', pdata[off:off+2])[0]; p = off + 2
-            strings.append(pdata[p:p+u16*2].decode('utf-16-le', errors='ignore'))
-
-    # Replace string 11 (the vector path) with Mitra milk bottle path
-    mitra_vector_path = 'M9,2h6a1.25,1.25 0 0 1 1.25,1.25A1.25,1.25 0 0 1 15,4.5H9A1.25,1.25 0 0 1 7.75,3.25 1.25,1.25 0 0 1 9,2zm1,2.5h4V7l2.5,2.5c0.94,0.94 1.5,2.21 1.5,3.54V19c0,1.66-1.34,3-3,3H9c-1.66,0-3-1.34-3-3v-5.96c0-1.33 0.56-2.6 1.5-3.54L10,7V4.5zm0,13l1.5,1.5 3-3'
-    if len(strings) > 11:
-        strings[11] = mitra_vector_path
-
-    new_pool_data = bytearray()
-    new_offsets = []
-    for s in strings:
-        new_offsets.append(len(new_pool_data))
-        encoded = s.encode('utf-8')
-        u16len = len(s)
-        u8len = len(encoded)
-        if u16len < 128:
-            new_pool_data.append(u16len)
-        else:
-            new_pool_data.append(0x80 | ((u16len >> 8) & 0x7f))
-            new_pool_data.append(u16len & 0xff)
-        if u8len < 128:
-            new_pool_data.append(u8len)
-        else:
-            new_pool_data.append(0x80 | ((u8len >> 8) & 0x7f))
-            new_pool_data.append(u8len & 0xff)
-        new_pool_data.extend(encoded)
-        new_pool_data.append(0)
-
-    while len(new_pool_data) % 4 != 0:
-        new_pool_data.append(0)
-
-    offsets_bytes = struct.pack(f'<{len(new_offsets)}I', *new_offsets)
-    new_strings_start = 28 + len(offsets_bytes)
-    new_chunk_size = 28 + len(offsets_bytes) + len(new_pool_data)
-    new_sp_header = struct.pack('<HHI', sp_tag & 0xffff, 28, new_chunk_size)
-    new_sp_meta = struct.pack('<IIIII', sp_string_count, sp_style_count, sp_flags, new_strings_start, 0)
-    new_sp = new_sp_header + new_sp_meta + offsets_bytes + new_pool_data
-
-    # Rest of xml
-    rest_xml = bytearray(data[offset + sp_size:])
-    # Change tint 0xff000000 (b'\x00\x00\x00\xff') to 0xffffffff (b'\xff\xff\xff\xff')
-    # Replace black tint/fill with white
-    rest_xml = rest_xml.replace(b'\x00\x00\x00\xff', b'\xff\xff\xff\xff')
-
-    new_total_size = 8 + len(new_sp) + len(rest_xml)
-    return struct.pack('<II', 0x00080003, new_total_size) + new_sp + bytes(rest_xml)
-
-def create_mitra_splash_html():
-    return """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mitra</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background-color: #183d2d;
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 1.5rem;
-            text-align: center;
-        }
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            max-width: 320px;
-        }
-        .icon-box {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 22px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-        }
-        h1 {
-            font-size: 1.6rem;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            margin-bottom: 0.35rem;
-        }
-        p {
-            font-size: 0.88rem;
-            opacity: 0.85;
-            line-height: 1.4;
-            margin-bottom: 1.75rem;
-        }
-        .spinner {
-            width: 32px;
-            height: 32px;
-            border: 3px solid rgba(255, 255, 255, 0.25);
-            border-top-color: #ffffff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="icon-box">
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
-                <rect x="9" y="2" width="6" height="2.5" rx="1.25" fill="#ffffff" />
-                <path d="M10 4.5H14V7L16.5 9.5C17.44 10.44 18 11.71 18 13.04V19C18 20.66 16.66 22 15 22H9C7.34 22 6 20.66 6 19V13.04C6 11.71 6.56 10.44 7.5 9.5L10 7V4.5Z" fill="#ffffff" fill-opacity="0.25" stroke="#ffffff" stroke-width="1.75" stroke-linejoin="round" />
-                <path d="M6.5 14.5C7.5 13.8 9.5 13.8 11 14.5C12.5 15.2 14.5 15.2 16 14.5C16.8 14.1 17.5 14.3 17.5 14.5V19C17.5 20.38 16.38 21.5 15 21.5H9C7.62 21.5 6.5 20.38 6.5 19V14.5Z" fill="#ffffff" fill-opacity="0.8" />
-                <path d="M10 17.5L11.5 19L14.5 16" stroke="#183d2d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-        </div>
-        <h1>Mitra</h1>
-        <p>Connecting to Kabir Bundele Delivery Confirmation Platform...</p>
-        <div class="spinner"></div>
-    </div>
-    <script>
-        // Immediately navigate into real Mitra platform
-        window.location.replace("https://mitra-beryl.vercel.app/");
-    </script>
-</body>
-</html>
-"""
-
-def create_mitra_settings_json():
-    return {
-        "sites": [
-            {
-                "url": "https://mitra-beryl.vercel.app/",
-                "title": "Mitra"
-            }
-        ],
-        "other": "https://mitra-beryl.vercel.app/",
-        "match": [
-            ["host", "equals", "mitra-beryl.vercel.app"],
-            ["host", "endsWith", "vercel.app"],
-            ["host", "endsWith", "supabase.co"],
-            ["host", "endsWith", "google.com"],
-            ["host", "endsWith", "google.co.in"],
-            ["host", "endsWith", "googleapis.com"],
-            ["host", "endsWith", "googleusercontent.com"],
-            ["host", "endsWith", "gstatic.com"]
-        ],
-        "skip": [
-            ["path", "endsWith", ".epub"],
-            ["query", "contains", "type=epub"]
-        ],
-        "remote_debug": False,
-        "console_log": False,
-        "js_interface": True,
-        "context_menu": False,
-        "not_matching": False,
-        "local_sites": False,
-        "update_zip": "",
-        "web_settings": {
-            "JavaScriptEnabled": True,
-            "DomStorageEnabled": True,
-            "DatabaseEnabled": True
-        },
-        "source": "assets",
-        "timestamp": "2026-10-16T14:30:00Z"
-    }
-
-def main():
-    src_apk = 'public/downloads/mitra-v0.2.apk'
-    out_apk_unsigned = 'scripts/mitra-unsigned.apk'
-    out_apk_signed = 'public/downloads/mitra-v0.2.apk'
-    apk_v1 = 'public/downloads/mitra-v0.1.apk'
-
-    print(f'[Mitra APK Builder] Processing {src_apk}...')
-    zin = zipfile.ZipFile(src_apk, 'r')
-
-    # Load pre-generated PNG icons
-    icon_48_data = open('scripts/icons/icon_48.png', 'rb').read()
-    icon_72_data = open('scripts/icons/icon_72.png', 'rb').read()
-    icon_96_data = open('scripts/icons/icon_96.png', 'rb').read()
-    icon_144_data = open('scripts/icons/icon_144.png', 'rb').read()
-    icon_192_data = open('scripts/icons/icon_192.png', 'rb').read()
-
-    zout = zipfile.ZipFile(out_apk_unsigned, 'w', compression=zipfile.ZIP_DEFLATED)
-
-    for item in zin.infolist():
-        fname = item.filename
-        # Skip old signatures in META-INF
-        if fname.startswith('META-INF/') and (fname.endswith('.SF') or fname.endswith('.RSA') or fname.endswith('.DSA') or fname == 'META-INF/MANIFEST.MF'):
-            continue
-
-        raw = zin.read(fname)
-
-        if fname == 'resources.arsc':
-            print('[Mitra APK Builder] Patching resources.arsc (app name & background)...')
-            raw = rebuild_arsc(raw)
-        elif fname == 'res/Qr.xml':
-            print('[Mitra APK Builder] Patching res/Qr.xml (milk bottle VectorDrawable)...')
-            raw = rebuild_qr_xml(raw)
-        elif fname in ['assets/settings.json', 'assets/local/config.json']:
-            print(f'[Mitra APK Builder] Patching {fname} (routing to mitra-beryl.vercel.app)...')
-            if fname == 'assets/settings.json':
-                raw = json.dumps(create_mitra_settings_json(), indent=2).encode('utf-8')
-            else:
-                raw = json.dumps({"sites": {"demo/index.html": "Mitra"}, "bundles": [], "prefix": "https://appassets.androidplatform.net/sites/"}).encode('utf-8')
-        elif fname in ['assets/web/index.html', 'assets/local/index.html', 'assets/demo/index.html']:
-            print(f'[Mitra APK Builder] Patching {fname} (branded splash & redirect)...')
-            raw = create_mitra_splash_html().encode('utf-8')
-        elif fname.startswith('res/') and fname.endswith('.png') and not fname.endswith('.9.png'):
-            # Replace legacy icon PNGs based on size
-            if raw.startswith(b'\x89PNG\r\n\x1a\n'):
-                w, h = struct.unpack('>II', raw[16:24])
-                if w == 48:
-                    raw = icon_48_data
-                elif w == 72:
-                    raw = icon_72_data
-                elif w == 96:
-                    raw = icon_96_data
-                elif w == 144:
-                    raw = icon_144_data
-                elif w >= 192:
-                    raw = icon_192_data
-
-        zout.writestr(item, raw)
-
-    zout.close()
-    zin.close()
-    print('[Mitra APK Builder] Repackaged unsigned APK successfully.')
-
-    # Java JRE Tools
-    jre_bin = r'C:\Program Files\Tableau\Tableau Public 2026.2\bin\jre\bin'
-    keytool = os.path.join(jre_bin, 'keytool.exe')
-    jarsigner = os.path.join(jre_bin, 'jarsigner.exe')
-
+def build_and_sign(aapt2_exe, apktool_jar, java_exe):
+    src_dir = 'scripts/apk_src'
+    unsigned_apk = 'scripts/mitra-unsigned.apk'
+    signed_apk = 'scripts/mitra-signed.apk'
     keystore = 'scripts/mitra-release.keystore'
     alias = 'mitra'
     storepass = 'mitra2026'
-
-    if not os.path.exists(keystore):
-        print('[Mitra APK Builder] Generating release keystore...')
-        cmd_gen = [
-            keytool,
-            '-genkeypair', '-v',
-            '-keystore', keystore,
-            '-alias', alias,
-            '-keyalg', 'RSA',
-            '-keysize', '2048',
-            '-validity', '10000',
-            '-storepass', storepass,
-            '-keypass', storepass,
-            '-dname', 'CN=Mitra, OU=DeliveryConfirmation, O=KabirBundele, L=Mumbai, ST=Maharashtra, C=IN'
-        ]
-        subprocess.check_call(cmd_gen)
-
     uber_signer = 'scripts/uber-apk-signer.jar'
-    java_exe = os.path.join(jre_bin, 'java.exe')
 
-    print('[Mitra APK Builder] ZipAligning and Signing APK with uber-apk-signer (v1, v2, v3 schemes)...')
-    shutil.copyfile(out_apk_unsigned, out_apk_signed)
+    print('[Mitra APK Builder] Compiling resources and packaging APK with AAPT2...')
+    cmd_build = [
+        java_exe,
+        '-jar', apktool_jar,
+        'b', src_dir,
+        '-o', unsigned_apk,
+        '--use-aapt2',
+        '--aapt', aapt2_exe
+    ]
+    subprocess.check_call(cmd_build)
+
+    print('[Mitra APK Builder] ZipAligning and Signing APK (v1, v2, v3 schemes)...')
+    shutil.copyfile(unsigned_apk, signed_apk)
     cmd_sign = [
         java_exe,
         '-jar', uber_signer,
-        '-a', out_apk_signed,
+        '-a', signed_apk,
         '--ks', keystore,
         '--ksAlias', alias,
         '--ksPass', storepass,
@@ -365,13 +127,95 @@ def main():
     subprocess.check_call(cmd_sign)
 
     print('[Mitra APK Builder] Verifying APK signature and zipalign...')
-    cmd_verify = [java_exe, '-jar', uber_signer, '-y', '-a', out_apk_signed]
+    cmd_verify = [java_exe, '-jar', uber_signer, '-y', '-a', signed_apk]
     subprocess.check_call(cmd_verify)
 
-    # Copy to v0.1 as well
-    shutil.copyfile(out_apk_signed, apk_v1)
-    size_mb = os.path.getsize(out_apk_signed) / (1024 * 1024)
-    print(f'[Mitra APK Builder] SUCCESS! Branded signed APK ready: {out_apk_signed} ({size_mb:.2f} MB)')
+    return signed_apk
+
+def verify_badging(aapt2_exe, signed_apk):
+    print('[Mitra APK Builder] Verifying APK Badging and Resource Densities with AAPT2...')
+    badging = subprocess.check_output([aapt2_exe, 'dump', 'badging', signed_apk], text=True, errors='ignore')
+    for line in badging.split('\n'):
+        if 'application:' in line or 'application-label:' in line or 'application-icon-' in line:
+            print(f'   [AAPT2 Badging] {line}')
+
+    # Check mipmap resources
+    resources = subprocess.check_output([aapt2_exe, 'dump', 'resources', signed_apk], text=True, errors='ignore')
+    mipmap_section = False
+    print('[Mitra APK Builder] Verified Mipmap Density Entries:')
+    for line in resources.split('\n'):
+        if 'type mipmap' in line:
+            mipmap_section = True
+        elif mipmap_section and 'type ' in line and not 'mipmap' in line:
+            mipmap_section = False
+        if mipmap_section and ('resource ' in line or '(' in line):
+            print(f'   {line.strip()}')
+
+def deploy_apk(signed_apk):
+    downloads_dir = 'public/downloads'
+    os.makedirs(downloads_dir, exist_ok=True)
+    out_v1_0 = os.path.join(downloads_dir, 'mitra-v1.0.apk')
+    
+    shutil.copyfile(signed_apk, out_v1_0)
+    
+    # Point 44: Keep only current (v1.0) + one previous fallback (v0.2). Delete v0.1 and all .idsig files.
+    for fname in os.listdir(downloads_dir):
+        fpath = os.path.join(downloads_dir, fname)
+        if fname.endswith('.idsig') or fname == 'mitra-v0.1.apk':
+            try:
+                os.remove(fpath)
+                print(f'[Mitra APK Builder] Cleaned up legacy file: {fname}')
+            except Exception as e:
+                print(f'[Mitra APK Builder] Could not remove {fname}: {e}')
+                
+    size_mb = os.path.getsize(out_v1_0) / (1024 * 1024)
+    print(f'[Mitra APK Builder] Successfully deployed genuine branded APK to {out_v1_0} ({size_mb:.2f} MB)!')
+
+def check_attached_devices(adb_exe, signed_apk):
+    print('[Mitra APK Builder] Checking for attached Android devices...')
+    try:
+        out = subprocess.check_output([adb_exe, 'devices'], text=True, errors='ignore')
+        lines = [line.strip() for line in out.strip().split('\n')[1:] if line.strip()]
+        devices = [line.split()[0] for line in lines if '\tdevice' in line]
+        if devices:
+            for dev in devices:
+                print(f'[Mitra APK Builder] Found connected Android device: {dev}')
+                print(f'[Mitra APK Builder] Installing {signed_apk} onto device {dev}...')
+                subprocess.check_call([adb_exe, '-s', dev, 'install', '-r', signed_apk])
+                print(f'[Mitra APK Builder] Installed successfully on {dev}!')
+                # Launch the app
+                subprocess.run([adb_exe, '-s', dev, 'shell', 'monkey', '-p', 'net.mikespub.mywebview', '-c', 'android.intent.category.LAUNCHER', '1'], capture_output=True)
+                print(f'[Mitra APK Builder] Launched Mitra on {dev}.')
+                # Take home screen screenshot
+                os.makedirs('scripts/screenshots', exist_ok=True)
+                screen_path = os.path.join('scripts/screenshots', f'{dev}_icon_screen.png')
+                with open(screen_path, 'wb') as sf:
+                    subprocess.run([adb_exe, '-s', dev, 'exec-out', 'screencap', '-p'], stdout=sf)
+                print(f'[Mitra APK Builder] Captured device screen to {screen_path}')
+        else:
+            print('[Mitra APK Builder] No physical Android device connected via ADB.')
+            print('   -> To install automatically on your phone: enable USB Debugging, plug phone in via USB, and re-run build.')
+            print('   -> Or download directly on your phone: open https://mitra-beryl.vercel.app/ and download the APK.')
+    except Exception as e:
+        print(f'[Mitra APK Builder] ADB check note: {e}')
+
+def main():
+    print('====================================================')
+    print('   Mitra Android APK Packaging & Icon System Build   ')
+    print('====================================================')
+    java_exe = find_java()
+    print(f'[Mitra APK Builder] Using Java: {java_exe}')
+    
+    aapt2_exe, apktool_jar, adb_exe = ensure_tools()
+    render_all_icons()
+    prepare_apk_source(apktool_jar, java_exe)
+    signed_apk = build_and_sign(aapt2_exe, apktool_jar, java_exe)
+    verify_badging(aapt2_exe, signed_apk)
+    deploy_apk(signed_apk)
+    check_attached_devices(adb_exe, signed_apk)
+    print('====================================================')
+    print('   Build Complete: Real Mitra App Icon Configured!   ')
+    print('====================================================')
 
 if __name__ == '__main__':
     main()

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "seed:admin": "npx tsx scripts/seed_admin.ts",
-    "restore:mongo": "npx tsx scripts/restore_from_mongodb.ts"
+    "restore:mongo": "npx tsx scripts/restore_from_mongodb.ts",
+    "build:apk": "python scripts/build_mitra_apk.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

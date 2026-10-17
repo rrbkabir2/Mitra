@@ -8,6 +8,7 @@ import { MilkBottleIcon } from '@/components/MilkBottleIcon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { compressImage } from '@/lib/imageCompression';
 import { sendWhatsAppDeliveryMessage, sendWhatsAppAbsentAlert } from '@/lib/whatsapp';
+import { messagingService } from '@/lib/messaging';
 import { MilkSubtype, ExtraItem, UnitType, Entry } from '@/types';
 import { CleanNumberInput } from '@/components/CleanNumberInput';
 import {
@@ -94,6 +95,7 @@ export default function TodayPage() {
     show: boolean;
     message: string;
     details: string;
+    personalUrl?: string;
   } | null>(null);
 
   const getVendorName = (vendorId: string) => {
@@ -189,6 +191,7 @@ export default function TodayPage() {
   const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
   const [isAddingExtraItem, setIsAddingExtraItem] = useState(false);
   const [isNewProductMode, setIsNewProductMode] = useState(false);
+  const [extraVendorId, setExtraVendorId] = useState<string>('');
   const [selectedExtraProduct, setSelectedExtraProduct] = useState('Fresh Malai Paneer');
   const [extraItemName, setExtraItemName] = useState('Fresh Malai Paneer');
   const [extraItemQty, setExtraItemQty] = useState<number>(1);
@@ -258,6 +261,7 @@ export default function TodayPage() {
     setExtraItems([]);
     setIsAddingExtraItem(false);
     setIsNewProductMode(false);
+    setExtraVendorId(dairyVendor?.id || (vendors.length > 0 ? vendors[0].id : ''));
 
     if (availableProductsList.length > 0) {
       const p = availableProductsList[0];
@@ -321,14 +325,15 @@ export default function TodayPage() {
       unit: p.unit_type,
       defaultPrice: p.default_price,
       emoji: getItemEmoji(p.name),
+      vendorId: p.vendor_id || undefined,
     }));
 
   const standardDairyStaples = [
-    { name: 'Farm Fresh Dahi / Curd', unit: 'count' as UnitType, defaultPrice: 40, emoji: '🥣' },
-    { name: 'Fresh Malai Paneer', unit: 'kilogram' as UnitType, defaultPrice: 380, emoji: '🧀' },
-    { name: 'Desi Cow Ghee', unit: 'litre' as UnitType, defaultPrice: 650, emoji: '🧈' },
-    { name: 'White Butter (Makhan)', unit: 'count' as UnitType, defaultPrice: 50, emoji: '🧈' },
-    { name: 'Masala Chaas', unit: 'count' as UnitType, defaultPrice: 15, emoji: '🥛' },
+    { name: 'Farm Fresh Dahi / Curd', unit: 'count' as UnitType, defaultPrice: 40, emoji: '🥣', vendorId: dairyVendor?.id },
+    { name: 'Fresh Malai Paneer', unit: 'kilogram' as UnitType, defaultPrice: 380, emoji: '🧀', vendorId: dairyVendor?.id },
+    { name: 'Desi Cow Ghee', unit: 'litre' as UnitType, defaultPrice: 650, emoji: '🧈', vendorId: dairyVendor?.id },
+    { name: 'White Butter (Makhan)', unit: 'count' as UnitType, defaultPrice: 50, emoji: '🧈', vendorId: dairyVendor?.id },
+    { name: 'Masala Chaas', unit: 'count' as UnitType, defaultPrice: 15, emoji: '🥛', vendorId: dairyVendor?.id },
   ];
 
   const availableProductsList = [...catalogExtraProducts];
@@ -346,10 +351,14 @@ export default function TodayPage() {
       return;
     }
 
-    if (isNewProductMode && saveCustomToCatalog && dairyVendor && household) {
+    const chosenVendor = vendors.find((v) => v.id === extraVendorId) || dairyVendor || vendors[0];
+    const targetVendorId = chosenVendor?.id;
+    const targetVendorName = chosenVendor?.name;
+
+    if (isNewProductMode && saveCustomToCatalog && targetVendorId && household) {
       addProduct({
         household_id: household.id,
-        vendor_id: dairyVendor.id,
+        vendor_id: targetVendorId,
         name: finalName,
         unit_type: extraItemUnit,
         default_price: extraItemPrice,
@@ -363,6 +372,8 @@ export default function TodayPage() {
       quantity: extraItemQty,
       unit: extraItemUnit,
       price: extraItemPrice,
+      vendor_id: targetVendorId,
+      vendor_name: targetVendorName,
     };
 
     setExtraItems((prev) => [...prev, newItem]);
@@ -445,14 +456,14 @@ export default function TodayPage() {
         notes: entryNotes,
       });
 
-      // 2. Dispatch bundled WhatsApp message to vendor with Approve/Deny buttons
-      const whatsappResult = await sendWhatsAppDeliveryMessage({
+      // 2. Dispatch multi-channel message (WhatsApp Cloud API, Fast2SMS, Personal Phone 1-Tap)
+      const dispatchRes = await messagingService.dispatchDelivery({
         vendorPhone: dairyVendor.phone_number,
         vendorName: dairyVendor.name,
         vendorToken: dairyVendor.access_token,
         entryId: createdEntry.id,
         date: today,
-        time: entryTime,
+        time: entryTime || new Date().toTimeString().substring(0, 5),
         milkType: selectedSubtype === 'cow' ? 'Cow' : 'Buffalo',
         quantity: entryQuantity,
         unitPrice: currentRate,
@@ -462,16 +473,40 @@ export default function TodayPage() {
         appUrl,
       });
 
+      const personalUrl = dispatchRes.channelResults.personal_phone?.personalUrl;
+
+      // Point 49: If personal phone channel is enabled and native share is supported, offer native share
+      if (typeof navigator !== 'undefined' && navigator.share && messagingService.getEnabledChannels().includes('personal_phone')) {
+        try {
+          const shareText = messagingService.generateMessageText({
+            vendorName: dairyVendor.name,
+            date: today,
+            time: entryTime || new Date().toTimeString().substring(0, 5),
+            milkType: selectedSubtype === 'cow' ? 'Cow' : 'Buffalo',
+            quantity: entryQuantity,
+            unitPrice: currentRate,
+            totalPrice: grandTotal,
+            extraItems: extraItems,
+            portalUrl: `${appUrl}/v/${dairyVendor.access_token}`,
+          });
+          navigator.share({
+            title: `Mitra Delivery - ${dairyVendor.name}`,
+            text: shareText,
+          }).catch(() => {});
+        } catch {
+          // ignore share errors
+        }
+      }
+
       setIsModalOpen(false);
       setSuccessToast({
         show: true,
-        message: 'Delivery entry logged & dispatched to vendor on WhatsApp!',
-        details: whatsappResult.isSimulated
-          ? `Simulated WhatsApp message dispatched to ${dairyVendor.name} (${dairyVendor.phone_number}). Status is pending vendor confirmation.`
-          : `Delivered receipt verified. Message ID: ${whatsappResult.messageId}.`,
+        message: 'Delivery entry logged & dispatched to vendor!',
+        details: `Dispatched to ${dairyVendor.name} (${dairyVendor.phone_number}). Status is pending vendor confirmation.`,
+        personalUrl,
       });
 
-      setTimeout(() => setSuccessToast(null), 6000);
+      setTimeout(() => setSuccessToast(null), personalUrl ? 12000 : 6000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save delivery';
       alert(`Error: ${msg}`);
@@ -617,13 +652,40 @@ export default function TodayPage() {
           role="alert"
         >
           <CheckCircle size={22} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div>
+          <div style={{ flex: 1 }}>
             <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#065f46' }}>
               {successToast.message}
             </h4>
             <p style={{ fontSize: '0.78rem', color: '#374151', marginTop: '0.25rem' }}>
               {successToast.details}
             </p>
+            {successToast.personalUrl && (
+              <div style={{ marginTop: '0.65rem' }}>
+                <a
+                  href={successToast.personalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    fontSize: '0.8rem',
+                    padding: '0.45rem 0.85rem',
+                    background: '#25D366',
+                    borderColor: '#25D366',
+                    color: '#ffffff',
+                    textDecoration: 'none',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                  }}
+                  id="btn-toast-personal-whatsapp"
+                >
+                  <Share2 size={15} />
+                  <span>Open WhatsApp (1-Tap Send to {dairyVendor?.name})</span>
+                </a>
+              </div>
+            )}
           </div>
           <button
             onClick={() => setSuccessToast(null)}
@@ -1410,6 +1472,26 @@ export default function TodayPage() {
                     </div>
                   </div>
 
+                  {/* Point 51: Vendor Selection field */}
+                  <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                      Vendor / Supplier:
+                    </label>
+                    <select
+                      value={extraVendorId || (dairyVendor?.id ?? '')}
+                      onChange={(e) => setExtraVendorId(e.target.value)}
+                      className="form-select"
+                      style={{ fontSize: '0.92rem', padding: '0.55rem 0.75rem', fontWeight: 600, width: '100%', background: '#fff' }}
+                      id="select-extra-vendor"
+                    >
+                      {vendors.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name} ({v.vendor_type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* 1. If NOT New Product Mode: Listed Products Dropdown */}
                   {!isNewProductMode ? (
                     <div className="form-group" style={{ marginBottom: '0.65rem' }}>
@@ -1427,6 +1509,9 @@ export default function TodayPage() {
                             setExtraItemUnit(found.unit);
                             setExtraItemPrice(found.defaultPrice);
                             setExtraItemQty(found.unit === 'kilogram' ? 0.5 : 1);
+                            if (found.vendorId && vendors.some((v) => v.id === found.vendorId)) {
+                              setExtraVendorId(found.vendorId);
+                            }
                           }
                         }}
                         className="form-select"
@@ -1478,7 +1563,7 @@ export default function TodayPage() {
                     </div>
                   )}
 
-                  {/* IN-BETWEEN BUTTON: "+ New Product / Item" when in list mode */}
+                  {/* Point 50: Prominent "+ New Product" Primary Button */}
                   {!isNewProductMode ? (
                     <div style={{ marginBottom: '0.75rem' }}>
                       <button
@@ -1489,24 +1574,26 @@ export default function TodayPage() {
                           setExtraItemPrice(40);
                           setExtraItemQty(1);
                         }}
+                        className="btn-primary"
                         style={{
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          color: 'var(--primary)',
-                          background: '#f0fdf4',
-                          border: '1px dashed var(--primary)',
-                          borderRadius: 'var(--radius-md)',
-                          padding: '0.45rem 0.85rem',
                           width: '100%',
-                          cursor: 'pointer',
+                          minHeight: '42px',
+                          padding: '0.65rem 1rem',
+                          fontSize: '0.88rem',
+                          fontWeight: 700,
+                          background: '#183d2d',
+                          borderColor: '#183d2d',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '0.35rem',
+                          gap: '0.45rem',
+                          borderRadius: 'var(--radius-md)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
                         }}
                         id="btn-switch-new-product"
                       >
-                        <Plus size={14} /> + New Product / New Item (Not in options? Click to type)
+                        <Plus size={18} />
+                        <span>+ New Product (Not in options? Click to type)</span>
                       </button>
                     </div>
                   ) : (
@@ -1638,6 +1725,11 @@ export default function TodayPage() {
                       <div className="bundled-item-info">
                         <span className="bundled-item-name">
                           {getItemEmoji(item.name)} {item.name}
+                          {item.vendor_name && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, marginLeft: '0.35rem' }}>
+                              ({item.vendor_name})
+                            </span>
+                          )}
                         </span>
                         <div className="bundled-item-calc">
                           {item.quantity} {item.unit === 'kilogram' ? 'kg' : item.unit === 'litre' ? 'L' : 'pkt'} × ₹{item.price} = <strong>₹{Math.round(item.price * item.quantity)}</strong>

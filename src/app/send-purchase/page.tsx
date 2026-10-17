@@ -15,6 +15,7 @@ import {
   ExternalLink,
   MessageSquare,
   Sparkles,
+  Plus,
 } from 'lucide-react';
 
 export default function SendPurchasePage() {
@@ -262,39 +263,25 @@ export default function SendPurchasePage() {
 
             {/* Requirement 27: Product Selection from Catalog or Custom Entry */}
             <div className="form-group">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+              <div style={{ marginBottom: '0.45rem' }}>
                 <label className="form-label" style={{ marginBottom: 0 }}>
                   Product Name
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCustomProduct(!isCustomProduct);
-                    if (!isCustomProduct) {
-                      setSelectedCatalogProductId('');
-                      setProductName('');
-                    }
-                  }}
-                  style={{
-                    fontSize: '0.74rem',
-                    color: '#183d2d',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    textDecoration: 'underline',
-                  }}
-                  id="btn-toggle-custom-product"
-                >
-                  {isCustomProduct ? '← Select from Catalog' : '✏️ + Type New / Custom Product'}
-                </button>
               </div>
 
               {!isCustomProduct ? (
                 <div>
                   <select
                     value={selectedCatalogProductId}
-                    onChange={(e) => handleSelectCatalogProduct(e.target.value)}
+                    onChange={(e) => {
+                      if (e.target.value === 'custom') {
+                        setIsCustomProduct(true);
+                        setSelectedCatalogProductId('');
+                        setProductName('');
+                      } else {
+                        handleSelectCatalogProduct(e.target.value);
+                      }
+                    }}
                     className="form-select"
                     id="select-purchase-product-catalog"
                   >
@@ -304,8 +291,40 @@ export default function SendPurchasePage() {
                         {p.name} ({p.unit_type} • ₹{p.default_price})
                       </option>
                     ))}
-                    <option value="custom">✏️ + Type a brand new product name</option>
+                    <option value="custom">+ Type a brand new product name</option>
                   </select>
+
+                  {/* Point 50: Prominent "+ New Product" Primary Button */}
+                  <div style={{ marginTop: '0.65rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomProduct(true);
+                        setSelectedCatalogProductId('');
+                        setProductName('');
+                      }}
+                      className="btn-primary"
+                      style={{
+                        width: '100%',
+                        minHeight: '42px',
+                        padding: '0.65rem 1rem',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        background: '#183d2d',
+                        borderColor: '#183d2d',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.45rem',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+                      }}
+                      id="btn-prominent-new-product"
+                    >
+                      <Plus size={18} />
+                      <span>+ New Product (Not in catalog? Tap to type)</span>
+                    </button>
+                  </div>
 
                   {selectedCatalogProductId && selectedCatalogProductId !== 'custom' && (
                     <div
@@ -341,19 +360,41 @@ export default function SendPurchasePage() {
                     id="input-purchase-name"
                     autoFocus
                   />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Unit:</span>
-                    {(['count', 'kilogram', 'litre'] as const).map((u) => (
-                      <button
-                        key={u}
-                        type="button"
-                        onClick={() => setProductUnit(u)}
-                        className={`filter-pill-btn ${productUnit === u ? 'active' : ''}`}
-                        style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}
-                      >
-                        {u}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Unit:</span>
+                      {(['count', 'kilogram', 'litre'] as const).map((u) => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setProductUnit(u)}
+                          className={`filter-pill-btn ${productUnit === u ? 'active' : ''}`}
+                          style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomProduct(false);
+                        setProductName('');
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--primary)',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                      }}
+                      id="btn-back-to-catalog"
+                    >
+                      ← Back to Catalog
+                    </button>
                   </div>
                 </div>
               )}

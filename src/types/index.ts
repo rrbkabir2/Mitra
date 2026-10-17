@@ -16,6 +16,8 @@ export interface ExtraItem {
   quantity: number;
   unit: UnitType;
   price: number;
+  vendor_id?: string;
+  vendor_name?: string;
 }
 
 export interface Household {

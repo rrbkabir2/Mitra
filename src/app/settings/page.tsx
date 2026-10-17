@@ -23,6 +23,8 @@ import {
   Zap,
   Info,
   Layers,
+  UserPlus,
+  Type,
 } from 'lucide-react';
 
 import { messagingService, MessagingChannel, ChannelConfig } from '@/lib/messaging';
@@ -53,6 +55,25 @@ export default function SettingsPage() {
   // Point 12: Messaging Channels State
   const [enabledChannels, setEnabledChannels] = useState<MessagingChannel[]>([]);
   const [channelConfigs, setChannelConfigs] = useState<ChannelConfig[]>([]);
+
+  // Point 41: Adjustable Font Size & Senior Accessibility
+  const [fontSize, setFontSizeState] = useState<'small' | 'default' | 'large' | 'xlarge'>('default');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = (localStorage.getItem('mitra_font_size') as 'small' | 'default' | 'large' | 'xlarge') || 'default';
+      setFontSizeState(saved);
+      document.documentElement.setAttribute('data-font-size', saved);
+    }
+  }, []);
+
+  const handleFontSizeChange = (size: 'small' | 'default' | 'large' | 'xlarge') => {
+    setFontSizeState(size);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mitra_font_size', size);
+      document.documentElement.setAttribute('data-font-size', size);
+    }
+  };
 
   useEffect(() => {
     setEnabledChannels(messagingService.getEnabledChannels());
@@ -275,8 +296,8 @@ export default function SettingsPage() {
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.15rem' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#183d2d' }}>Mitra</span>
-                  <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 700 }}>
-                    Version 0.1
+                  <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#166534', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 700 }}>
+                    Version 1.0 (Latest)
                   </span>
                 </div>
               </div>
@@ -317,32 +338,48 @@ export default function SettingsPage() {
                   </span>
                 </div>
                 <p style={{ fontSize: '0.77rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                  Packaged web application with standalone window support on Android smartphones.
+                  Packaged Android application with persistent mobile session and genuine milk-bottle app icon.
                 </p>
               </div>
 
               <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                 <a
-                  href="/downloads/mitra-v0.2.apk"
-                  download="mitra-v0.2.apk"
+                  href="/downloads/mitra-v1.0.apk"
+                  download="mitra-v1.0.apk"
                   className="btn-primary"
                   style={{
                     width: '100%',
                     background: '#183d2d',
                     borderColor: '#183d2d',
                     fontSize: '0.82rem',
-                    padding: '0.5rem 0.85rem',
+                    padding: '0.55rem 0.85rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '0.4rem',
                     textDecoration: 'none',
                     borderRadius: '8px',
+                    fontWeight: 700,
                   }}
                   id="btn-download-apk-direct"
                 >
                   <Download size={14} />
-                  <span>Download Mitra APK (version 0.2 • 7.1 MB Signed)</span>
+                  <span>Download Mitra APK (v1.0 • 7.2 MB Signed)</span>
+                </a>
+
+                <a
+                  href="/downloads/mitra-v0.2.apk"
+                  download="mitra-v0.2.apk"
+                  style={{
+                    fontSize: '0.74rem',
+                    color: '#64748b',
+                    textAlign: 'center',
+                    textDecoration: 'underline',
+                    padding: '0.2rem 0',
+                  }}
+                  id="link-fallback-apk"
+                >
+                  Download Fallback Build (v0.2)
                 </a>
 
                 <button
@@ -563,6 +600,50 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* POINT 41: ADJUSTABLE FONT SIZE FOR SENIOR ACCESSIBILITY */}
+        <section className="content-card" id="section-font-size-accessibility">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+            <Type size={20} color="var(--primary)" />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Font Size & Readability</h3>
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.45 }}>
+            Adjust the display text size across the entire Mitra application for comfortable reading and senior accessibility.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+            {[
+              { id: 'small', label: 'Small', sample: '14px', sub: 'Compact' },
+              { id: 'default', label: 'Default', sample: '16px', sub: 'Standard' },
+              { id: 'large', label: 'Large', sample: '18px', sub: 'Senior Friendly' },
+              { id: 'xlarge', label: 'Extra Large', sample: '20px', sub: 'Max Legibility' },
+            ].map((fItem) => (
+              <button
+                key={fItem.id}
+                type="button"
+                onClick={() => handleFontSizeChange(fItem.id as 'small' | 'default' | 'large' | 'xlarge')}
+                className={`quantity-card ${fontSize === fItem.id ? 'active' : ''}`}
+                style={{
+                  padding: '0.85rem 0.65rem',
+                  textAlign: 'center',
+                  borderColor: fontSize === fItem.id ? 'var(--primary)' : 'var(--border-glass)',
+                  background: fontSize === fItem.id ? 'var(--primary-light)' : 'var(--bg-card)',
+                }}
+                id={`btn-font-size-${fItem.id}`}
+              >
+                <div style={{ fontSize: fItem.sample, fontWeight: 800, color: fontSize === fItem.id ? 'var(--primary)' : 'var(--text-primary)', marginBottom: '0.2rem' }}>
+                  Aa
+                </div>
+                <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>
+                  {fItem.label}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {fItem.sub}
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* 2. ADVANCED MODE TOGGLE */}
         <section className="content-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -777,33 +858,73 @@ export default function SettingsPage() {
             <div style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.65rem', color: 'var(--text-primary)' }}>
               + Add New Administrator
             </div>
-            <form onSubmit={handleAddAdmin} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr)) auto', gap: '0.65rem' }}>
-              <input
-                type="email"
-                placeholder="admin@email.com"
-                value={newAdminEmail}
-                onChange={(e) => setNewAdminEmail(e.target.value)}
-                className="form-input"
-                required
-                style={{ fontSize: '0.85rem' }}
-              />
-              <input
-                type="password"
-                placeholder="Temporary Password (min 6)"
-                value={newAdminPassword}
-                onChange={(e) => setNewAdminPassword(e.target.value)}
-                className="form-input"
-                required
-                minLength={6}
-                style={{ fontSize: '0.85rem' }}
-              />
+            <form
+              onSubmit={handleAddAdmin}
+              autoComplete="off"
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr)) auto', gap: '0.75rem', alignItems: 'end' }}
+            >
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.76rem', fontWeight: 700, color: '#334155' }}>
+                  Admin Email
+                </label>
+                <input
+                  type="email"
+                  name="new-admin-email-field"
+                  placeholder="admin@email.com"
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  className="form-input"
+                  required
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  style={{ fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.76rem', fontWeight: 700, color: '#334155' }}>
+                  Temporary Password
+                </label>
+                <input
+                  type="password"
+                  name="new-admin-password-field"
+                  placeholder="Min 6 characters"
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  className="form-input"
+                  required
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  minLength={6}
+                  style={{ fontSize: '0.85rem' }}
+                />
+              </div>
+
               <button
                 type="submit"
                 className="btn-primary"
                 disabled={isSubmittingAdmin}
-                style={{ whiteSpace: 'nowrap', padding: '0 1rem', fontSize: '0.85rem' }}
+                style={{
+                  minHeight: '42px',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  background: '#183d2d',
+                  borderColor: '#183d2d',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.45rem',
+                  whiteSpace: 'nowrap',
+                }}
+                id="btn-submit-add-admin"
               >
-                {isSubmittingAdmin ? 'Adding...' : 'Add Admin'}
+                <UserPlus size={16} />
+                <span>{isSubmittingAdmin ? 'Adding...' : 'Add Administrator'}</span>
               </button>
             </form>
           </div>
