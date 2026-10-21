@@ -252,51 +252,22 @@ function generateDefaultEntries(): Entry[] {
   return result.reverse(); // newest first
 }
 
-const DEFAULT_ENTRIES: Entry[] = generateDefaultEntries();
+// Point 54: Default operational data starts empty in live app; sample data is in supabase/sample_delivery_seed.sql
+const DEFAULT_ENTRIES: Entry[] = [];
 
-const DEFAULT_PRICE_REQUESTS: PriceChangeRequest[] = [
-  {
-    id: 'pcr-01',
-    household_id: 'hh-01',
-    vendor_id: 'v-01',
-    product_id: 'prod-01',
-    old_price: 58,
-    new_price: 60,
-    status: 'approved',
-    requested_at: new Date(Date.now() - 864000000).toISOString(),
-    resolved_at: new Date(Date.now() - 860000000).toISOString(),
-  },
-];
+const DEFAULT_PRICE_REQUESTS: PriceChangeRequest[] = [];
 
-const getPastDate = (daysAgo: number): string => {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().split('T')[0];
-};
-
-const DEFAULT_PURCHASES: PurchaseRecord[] = [
-  {
-    id: 'pr-01',
-    household_id: 'hh-01',
-    vendor_id: 'v-01',
-    product_name: 'Pure Desi Cow Ghee (500g)',
-    quantity: 1,
-    total_price: 450,
-    date: getPastDate(6),
-    sent_at: new Date(Date.now() - 518400000).toISOString(),
-    vendor_name: 'Ramesh Patil Dairy',
-  },
-];
+const DEFAULT_PURCHASES: PurchaseRecord[] = [];
 
 // In-browser / In-memory reactive state manager
 class MitraStore {
   private household: Household = DEFAULT_HOUSEHOLD;
   private vendors: Vendor[] = [...DEFAULT_VENDORS];
   private products: Product[] = [...DEFAULT_PRODUCTS];
-  private entries: Entry[] = [...DEFAULT_ENTRIES];
-  private priceRequests: PriceChangeRequest[] = [...DEFAULT_PRICE_REQUESTS];
-  private purchases: PurchaseRecord[] = [...DEFAULT_PURCHASES];
-  private monthlyMessageCount: number = 84; // 84 messages logged this month
+  private entries: Entry[] = [];
+  private priceRequests: PriceChangeRequest[] = [];
+  private purchases: PurchaseRecord[] = [];
+  private monthlyMessageCount: number = 0;
   private listeners: Array<() => void> = [];
   private isClient: boolean = false;
 
@@ -327,11 +298,6 @@ class MitraStore {
       const h = localStorage.getItem('mitra_household');
       if (h) {
         this.household = JSON.parse(h);
-        // Automatic migration: update old placeholder names to Kabir Bundele
-        if (this.household.name === 'Sharma Household' || this.household.name === "Meera's home") {
-          this.household.name = 'Kabir Bundele';
-          this.saveToStorage();
-        }
       }
 
       const v = localStorage.getItem('mitra_vendors');
@@ -363,41 +329,67 @@ class MitraStore {
         }
       }
 
+      // Point 54: Strictly load user-recorded entries or empty array (no forced sample data injection)
       const e = localStorage.getItem('mitra_entries');
       if (e) {
-        this.entries = JSON.parse(e);
-        // Requirement 22: If local storage has 5 or fewer entries, upgrade with the 5-month realistic history dataset
-        if (this.entries.length <= 5) {
-          this.entries = DEFAULT_ENTRIES;
-          this.saveToStorage();
-        } else {
-          // Migration: entries previously set by system_auto with 'confirmed' are now correctly 'auto-confirmed'
-          let updatedEntries = false;
-          this.entries = this.entries.map((entry) => {
-            if (entry.status_set_by === 'system_auto' && entry.status === 'confirmed') {
-              updatedEntries = true;
-              return { ...entry, status: 'auto-confirmed' as EntryStatus };
-            }
-            return entry;
-          });
-          if (updatedEntries) this.saveToStorage();
+        try {
+          this.entries = JSON.parse(e);
+        } catch {
+          this.entries = [];
         }
       } else {
-        this.entries = DEFAULT_ENTRIES;
-        this.saveToStorage();
+        this.entries = [];
       }
 
       const pr = localStorage.getItem('mitra_price_requests');
-      if (pr) this.priceRequests = JSON.parse(pr);
+      if (pr) {
+        try {
+          this.priceRequests = JSON.parse(pr);
+        } catch {
+          this.priceRequests = [];
+        }
+      }
 
       const pur = localStorage.getItem('mitra_purchases');
-      if (pur) this.purchases = JSON.parse(pur);
+      if (pur) {
+        try {
+          this.purchases = JSON.parse(pur);
+        } catch {
+          this.purchases = [];
+        }
+      } else {
+        this.purchases = [];
+      }
 
       const mc = localStorage.getItem('mitra_msg_count');
       if (mc) this.monthlyMessageCount = parseInt(mc, 10);
     } catch (e) {
       console.error('LocalStorage load error:', e);
     }
+  }
+
+  /**
+   * Point 55: Destructive wipe of operational/transactional data only.
+   * Keeps admin accounts, login credentials, household settings, and product/vendor catalogs.
+   */
+  public clearOperationalData() {
+    this.entries = [];
+    this.purchases = [];
+    this.priceRequests = [];
+    this.monthlyMessageCount = 0;
+    if (this.isClient) {
+      try {
+        localStorage.removeItem('mitra_entries');
+        localStorage.removeItem('mitra_purchases');
+        localStorage.removeItem('mitra_price_requests');
+        localStorage.removeItem('mitra_msg_count');
+        localStorage.removeItem('mitra_messaging_logs');
+      } catch (e) {
+        console.error('LocalStorage clear error:', e);
+      }
+    }
+    this.saveToStorage();
+    this.notify();
   }
 
   public subscribe(listener: () => void) {

@@ -353,7 +353,7 @@ export default function WhatsAppUsagePage() {
                   {personalUsage.count}
                 </span>
                 <span style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600 }}>
-                  messages dispatched this month
+                  1-tap dispatches launched this month
                 </span>
               </div>
 
@@ -361,10 +361,10 @@ export default function WhatsAppUsagePage() {
                 No limit, no cap, and zero API costs. Mitra prepares the formatted message & image link, letting you send with a single tap through your phone with no typing.
               </p>
 
-              <div style={{ background: '#ffffff', padding: '0.65rem 0.75rem', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
-                <div style={{ fontSize: '0.72rem', color: '#3b82f6' }}>Direct Device Delivery Status</div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e40af', marginTop: '0.15rem' }}>
-                  Ready on Kabir Bundele's phone • No carrier limits
+              <div style={{ background: '#eff6ff', padding: '0.65rem 0.75rem', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 700 }}>1-Tap Dispatch Tracking</div>
+                <div style={{ fontSize: '0.76rem', color: '#1e40af', marginTop: '0.15rem', lineHeight: 1.35 }}>
+                  Counter tracks when "Open WhatsApp" is tapped to launch the chat. Since messages are sent directly from your personal WhatsApp app rather than Meta's Business Cloud API, end-to-end delivery confirmation is handled within WhatsApp itself.
                 </div>
               </div>
             </div>
@@ -476,7 +476,7 @@ export default function WhatsAppUsagePage() {
                     </span>
                     {log.status === 'success' ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#16a34a', fontWeight: 700, fontSize: '0.75rem' }}>
-                        <CheckCircle2 size={14} /> Delivered
+                        <CheckCircle2 size={14} /> {log.channel === 'personal_phone' ? '1-Tap Opened' : 'Delivered'}
                       </span>
                     ) : (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: '#dc2626', fontWeight: 700, fontSize: '0.75rem' }}>

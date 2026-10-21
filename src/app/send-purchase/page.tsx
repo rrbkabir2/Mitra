@@ -35,7 +35,7 @@ export default function SendPurchasePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Requirement 28: Toast state with multi-channel details & optional 1-tap personal phone URL
-  const [toastData, setToastData] = useState<{ message: string; personalUrl?: string } | null>(null);
+  const [toastData, setToastData] = useState<{ message: string; personalUrl?: string; vendorPhone?: string; vendorName?: string } | null>(null);
   const [enabledChannels, setEnabledChannels] = useState<MessagingChannel[]>([]);
 
   useEffect(() => {
@@ -145,6 +145,8 @@ export default function SendPurchasePage() {
       setToastData({
         message: `Purchase of ${productName} (₹${totalPrice}) recorded! ${dispatchRes.summaryText}`,
         personalUrl: dispatchRes.channelResults.personal_phone?.personalUrl,
+        vendorPhone: vendor?.phone_number,
+        vendorName: vendor?.name,
       });
 
       // Reset form
@@ -160,6 +162,25 @@ export default function SendPurchasePage() {
       alert(msg);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Point 52: Reliable 1-Tap WhatsApp Opener without getting stuck on "fetching"
+  const handleOpenPersonalWhatsApp = (url: string, phone: string) => {
+    messagingService.recordPersonalPhoneLaunch(phone, undefined, '1-Tap Purchase notification sent via WhatsApp');
+    const isMobile = typeof navigator !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isMobile) {
+      const cleanDigits = phone.replace(/[^0-9]/g, '');
+      const formattedPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+      const textMatch = url.match(/text=([^&]*)/);
+      const encodedText = textMatch ? textMatch[1] : '';
+      const appUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodedText}`;
+      window.location.href = appUrl;
+      setTimeout(() => {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }, 1200);
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -191,10 +212,9 @@ export default function SendPurchasePage() {
               {toastData.message}
             </p>
             {toastData.personalUrl && (
-              <a
-                href={toastData.personalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => handleOpenPersonalWhatsApp(toastData.personalUrl!, toastData.vendorPhone || '')}
                 className="btn-primary"
                 style={{
                   display: 'inline-flex',
@@ -206,13 +226,16 @@ export default function SendPurchasePage() {
                   background: '#25D366',
                   borderColor: '#25D366',
                   color: '#ffffff',
-                  textDecoration: 'none',
+                  border: 'none',
                   borderRadius: '6px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
                 }}
+                id="btn-toast-purchase-whatsapp"
               >
-                <span>Open WhatsApp (1-Tap Send)</span>
+                <span>Open WhatsApp (1-Tap Send to {toastData.vendorName || 'Vendor'})</span>
                 <ExternalLink size={13} />
-              </a>
+              </button>
             )}
           </div>
           <button

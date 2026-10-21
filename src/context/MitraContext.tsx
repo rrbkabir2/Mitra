@@ -64,6 +64,7 @@ interface MitraContextType {
   toggleVendorAutoMonthlyReport: (vendorId: string, enabled: boolean) => Promise<boolean>;
   setAllVendorsAutoMonthlyReport: (enabled: boolean) => Promise<void>;
   autoConfirmOverdueDeliveries: (hours?: number) => Promise<number>;
+  clearOperationalData: () => Promise<boolean>;
 }
 
 const MitraContext = createContext<MitraContextType | null>(null);
@@ -134,7 +135,7 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
         .select('*')
         .order('entry_date', { ascending: false })
         .order('entry_time', { ascending: false });
-      if (eData && eData.length > 0) {
+      if (eData) {
         mitraStore.setEntries(eData);
       }
 
@@ -721,6 +722,24 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
     return count;
   };
 
+  /**
+   * Point 55: Clears operational data both on Supabase database and client storage.
+   */
+  const clearOperationalData = async (): Promise<boolean> => {
+    try {
+      await fetch('/api/admin/clear-data', { method: 'POST' });
+    } catch (e) {
+      console.error('Failed to call clear-data API:', e);
+    }
+    mitraStore.clearOperationalData();
+    messagingService.clearLogs();
+    setEntries([]);
+    setPurchases([]);
+    setPriceRequests([]);
+    setWhatsappUsageCount(0);
+    return true;
+  };
+
   const pruneSettledPhotos = (): number => {
     return mitraStore.pruneOldPhotos();
   };
@@ -759,6 +778,7 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
         toggleVendorAutoMonthlyReport,
         setAllVendorsAutoMonthlyReport,
         autoConfirmOverdueDeliveries,
+        clearOperationalData,
       }}
     >
       {children}

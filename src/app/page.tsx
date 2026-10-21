@@ -96,6 +96,8 @@ export default function TodayPage() {
     message: string;
     details: string;
     personalUrl?: string;
+    entryId?: string;
+    vendorPhone?: string;
   } | null>(null);
 
   const getVendorName = (vendorId: string) => {
@@ -504,9 +506,11 @@ export default function TodayPage() {
         message: 'Delivery entry logged & dispatched to vendor!',
         details: `Dispatched to ${dairyVendor.name} (${dairyVendor.phone_number}). Status is pending vendor confirmation.`,
         personalUrl,
+        entryId: createdEntry.id,
+        vendorPhone: dairyVendor.phone_number,
       });
 
-      setTimeout(() => setSuccessToast(null), personalUrl ? 12000 : 6000);
+      setTimeout(() => setSuccessToast(null), personalUrl ? 15000 : 6000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save delivery';
       alert(`Error: ${msg}`);
@@ -546,6 +550,31 @@ export default function TodayPage() {
       alert(`Error: ${msg}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Point 52: Reliable 1-Tap WhatsApp Opener without getting stuck on "fetching"
+  const handleOpenPersonalWhatsApp = (url: string, phone: string, entryId?: string) => {
+    // 1. Record the 1-tap dispatch now that user actually taps it
+    messagingService.recordPersonalPhoneLaunch(phone, entryId, '1-Tap WhatsApp chat opened by user');
+
+    // 2. Reliable opening:
+    const isMobile = typeof navigator !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isMobile) {
+      // Direct deep link avoids web fetching state completely
+      const cleanDigits = phone.replace(/[^0-9]/g, '');
+      const formattedPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+      const textMatch = url.match(/text=([^&]*)/);
+      const encodedText = textMatch ? textMatch[1] : '';
+      const appUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodedText}`;
+      
+      // Try launching app scheme directly, and fallback to wa.me if not handled
+      window.location.href = appUrl;
+      setTimeout(() => {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }, 1200);
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -661,10 +690,15 @@ export default function TodayPage() {
             </p>
             {successToast.personalUrl && (
               <div style={{ marginTop: '0.65rem' }}>
-                <a
-                  href={successToast.personalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleOpenPersonalWhatsApp(
+                      successToast.personalUrl!,
+                      successToast.vendorPhone || dairyVendor?.phone_number || '',
+                      successToast.entryId
+                    )
+                  }
                   className="btn-primary"
                   style={{
                     display: 'inline-flex',
@@ -675,15 +709,16 @@ export default function TodayPage() {
                     background: '#25D366',
                     borderColor: '#25D366',
                     color: '#ffffff',
-                    textDecoration: 'none',
+                    border: 'none',
                     borderRadius: '6px',
                     fontWeight: 700,
+                    cursor: 'pointer',
                   }}
                   id="btn-toast-personal-whatsapp"
                 >
                   <Share2 size={15} />
                   <span>Open WhatsApp (1-Tap Send to {dairyVendor?.name})</span>
-                </a>
+                </button>
               </div>
             )}
           </div>

@@ -25,6 +25,7 @@ import {
   Layers,
   UserPlus,
   Type,
+  AlertTriangle,
 } from 'lucide-react';
 
 import { messagingService, MessagingChannel, ChannelConfig } from '@/lib/messaging';
@@ -50,6 +51,7 @@ export default function SettingsPage() {
     setLanguage,
     toggleAdvancedMode,
     pruneSettledPhotos,
+    clearOperationalData,
   } = useMitra();
 
   // Point 12: Messaging Channels State
@@ -58,6 +60,29 @@ export default function SettingsPage() {
 
   // Point 41: Adjustable Font Size & Senior Accessibility
   const [fontSize, setFontSizeState] = useState<'small' | 'default' | 'large' | 'xlarge'>('default');
+
+  // Point 55: Delete All Data State & Confirmation Modal
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isDeletingData, setIsDeletingData] = useState(false);
+  const [deleteDataMsg, setDeleteDataMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleExecuteDeleteAllData = async () => {
+    setIsDeletingData(true);
+    setDeleteDataMsg(null);
+    try {
+      await clearOperationalData();
+      setShowDeleteConfirmModal(false);
+      setDeleteDataMsg({
+        type: 'success',
+        text: 'All operational delivery entries, purchases, and channel dispatch logs have been successfully wiped.',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete operational data';
+      setDeleteDataMsg({ type: 'error', text: `Error: ${msg}` });
+    } finally {
+      setIsDeletingData(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -931,7 +956,7 @@ export default function SettingsPage() {
         </section>
 
         {/* =========================================================================
-            POINT 22: VERIFICATION TESTING & 5-MONTH SAMPLE DATA SEEDING
+            POINT 22 & POINT 54: VERIFICATION TESTING & 5-MONTH SAMPLE DATA SEEDING
             ========================================================================= */}
         <section className="content-card" id="section-sample-data">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
@@ -939,16 +964,31 @@ export default function SettingsPage() {
               <Layers size={20} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.12rem', fontWeight: 800 }}>Sample Delivery History & Verification Data</h3>
+              <h3 style={{ fontSize: '1.12rem', fontWeight: 800 }}>Sample Delivery History & Standalone SQL Export</h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Populate or refresh database with 5 months (June–October 2026) of realistic deliveries across multiple vendors.
+                Live database is clean. Reload 5 months of test data on demand or use the exported SQL script.
               </p>
             </div>
           </div>
 
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '1rem' }}>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '0.85rem' }}>
             Enables full testing of History page filters (Status: Pending, Confirmed, Auto-Confirmed, Denied, Absent; Vendors: Ramesh Patil Dairy, Kisan Fresh Groceries, Amul Country Fresh; Multi-Month Date Range picker).
           </p>
+
+          <div
+            style={{
+              padding: '0.75rem',
+              borderRadius: 'var(--radius-md)',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              fontSize: '0.78rem',
+              color: '#334155',
+              lineHeight: 1.45,
+              marginBottom: '1rem',
+            }}
+          >
+            📄 <strong>Standalone SQL File Available:</strong> The complete 5-month realistic dataset is preserved in <code style={{ background: '#e2e8f0', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>supabase/sample_delivery_seed.sql</code>. You can copy and execute it directly in the Supabase SQL Editor anytime to reload the sample dataset.
+          </div>
 
           {seedStatusMsg && (
             <div
@@ -977,6 +1017,173 @@ export default function SettingsPage() {
             {isSeedingData ? 'Populating Database (5 Months)...' : 'Seed 5 Months of Sample History'}
           </button>
         </section>
+
+        {/* =========================================================================
+            POINT 55: DELETE ALL DATA (WIPES ONLY OPERATIONAL / TRANSACTIONAL DATA)
+            ========================================================================= */}
+        <section className="content-card" id="section-delete-all-data" style={{ border: '1.5px solid #fecaca' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
+            <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '0.45rem', borderRadius: '10px', display: 'flex', border: '1px solid #fecaca' }}>
+              <Trash2 size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.12rem', fontWeight: 800, color: '#991b1b' }}>Delete All Data (Operational & History)</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Wipes only operational records — delivery entries, delivery history, purchases, and channel logs.
+              </p>
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: '0.75rem',
+              borderRadius: 'var(--radius-md)',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              fontSize: '0.78rem',
+              color: '#166534',
+              lineHeight: 1.45,
+              marginBottom: '1rem',
+            }}
+          >
+            🛡️ <strong>Safety Guarantee:</strong> This action wipes <strong>ONLY</strong> delivery entries, purchases, and messaging logs. It will <strong>NOT</strong> delete your administrator accounts, login credentials, or household settings.
+          </div>
+
+          {deleteDataMsg && (
+            <div
+              style={{
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-md)',
+                background: deleteDataMsg.type === 'success' ? '#f0fdf4' : '#fef2f2',
+                color: deleteDataMsg.type === 'success' ? '#166534' : '#b91c1c',
+                border: `1px solid ${deleteDataMsg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+                fontSize: '0.82rem',
+                marginBottom: '1rem',
+                fontWeight: 600,
+              }}
+            >
+              {deleteDataMsg.text}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirmModal(true)}
+            className="btn-secondary"
+            id="btn-trigger-delete-all-data"
+            style={{
+              fontSize: '0.86rem',
+              padding: '0.65rem 1.25rem',
+              background: '#fef2f2',
+              borderColor: '#f87171',
+              color: '#b91c1c',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <Trash2 size={16} />
+            <span>Delete All Operational Data</span>
+          </button>
+        </section>
+
+        {/* POINT 55: DESTRUCTIVE ACTION CONFIRMATION MODAL */}
+        {showDeleteConfirmModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1100,
+              background: 'rgba(0, 0, 0, 0.55)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
+              animation: 'fadeIn 0.2s ease-out',
+            }}
+            onClick={() => !isDeletingData && setShowDeleteConfirmModal(false)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '18px',
+                padding: '1.5rem',
+                maxWidth: '460px',
+                width: '100%',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+                border: '1.5px solid #fecaca',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '0.65rem', borderRadius: '12px' }}>
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#991b1b' }}>
+                    Confirm Permanent Deletion
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    This is a destructive operational action
+                  </p>
+                </div>
+              </div>
+
+              <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+                Are you sure you want to delete all operational delivery records? This will permanently wipe all delivery entries, history items, purchases, and messaging logs from both your live database and browser cache.
+              </p>
+
+              <div
+                style={{
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: '8px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.78rem',
+                  color: '#475569',
+                  marginBottom: '1.5rem',
+                }}
+              >
+                🔒 <strong>Preserved Data:</strong> Administrator accounts, passwords, and household settings will <strong>NOT</strong> be affected.
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirmModal(false)}
+                  disabled={isDeletingData}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.86rem', padding: '0.6rem 1.15rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteDeleteAllData}
+                  disabled={isDeletingData}
+                  style={{
+                    fontSize: '0.86rem',
+                    padding: '0.6rem 1.25rem',
+                    background: '#dc2626',
+                    border: '1px solid #b91c1c',
+                    color: '#ffffff',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                  id="btn-confirm-delete-all-data"
+                >
+                  {isDeletingData ? 'Deleting Data...' : 'Yes, Delete All Data'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

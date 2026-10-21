@@ -22,6 +22,17 @@ export interface MessageLog {
   details?: string;
 }
 
+export function formatWhatsAppPhone(phone: string): string {
+  let cleaned = phone.replace(/[^0-9]/g, '');
+  if (cleaned.startsWith('0') && cleaned.length === 11) {
+    cleaned = cleaned.substring(1);
+  }
+  if (cleaned.length === 10) {
+    cleaned = `91${cleaned}`;
+  }
+  return cleaned;
+}
+
 const FAST2SMS_COST_PER_MSG = 0.25; // INR per message
 
 class MessagingService {
@@ -44,30 +55,8 @@ class MessagingService {
       if (savedLogs) {
         this.logs = JSON.parse(savedLogs);
       } else {
-        // Pre-seed some realistic historical logs for current month
-        const currentMonth = new Date().toISOString().substring(0, 7);
-        this.logs = [
-          {
-            id: 'log-01',
-            channel: 'whatsapp_cloud',
-            recipient_phone: '+919876543210',
-            timestamp: `${currentMonth}-01T07:30:00Z`,
-            month: currentMonth,
-            status: 'success',
-            cost: 0,
-            details: 'Delivery logged',
-          },
-          {
-            id: 'log-02',
-            channel: 'personal_phone',
-            recipient_phone: '+919876543210',
-            timestamp: `${currentMonth}-02T07:32:00Z`,
-            month: currentMonth,
-            status: 'success',
-            cost: 0,
-            details: '1-tap native dispatch',
-          },
-        ];
+        // Default starts clean with zero fake seeded logs
+        this.logs = [];
         this.saveLogs();
       }
     } catch (e) {
@@ -172,6 +161,27 @@ class MessagingService {
   public getAllLogs(month?: string): MessageLog[] {
     if (!month) return this.logs;
     return this.logs.filter((l) => l.month === month);
+  }
+
+  public clearLogs() {
+    this.logs = [];
+    this.saveLogs();
+  }
+
+  /**
+   * Point 52: Records personal phone 1-tap dispatch ONLY when the user actually
+   * taps the "Open WhatsApp" button, avoiding false counter increments.
+   */
+  public recordPersonalPhoneLaunch(phone: string, entryId?: string, details?: string) {
+    const formattedPhone = formatWhatsAppPhone(phone);
+    return this.logMessage(
+      'personal_phone',
+      formattedPhone,
+      'success',
+      0,
+      details || '1-Tap WhatsApp chat opened on device',
+      entryId
+    );
   }
 
   /**
@@ -332,10 +342,13 @@ class MessagingService {
     // 3. Channel C: Personal Phone 1-Tap Channel
     if (this.enabledChannels.includes('personal_phone')) {
       results.personal_phone.attempted = true;
-      const personalUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(messageText)}`;
+      const formattedPhone = formatWhatsAppPhone(params.vendorPhone);
+      // Point 52: Use official universal link wa.me to prevent getting stuck in "fetching" web state
+      const personalUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(messageText)}`;
       results.personal_phone.personalUrl = personalUrl;
       results.personal_phone.success = true;
-      this.logMessage('personal_phone', params.vendorPhone, 'success', 0, 'Prepared for 1-tap dispatch', params.entryId);
+      // Point 52: Do NOT auto-increment the usage counter here during preparation!
+      // The counter is recorded only when the user actually taps the "Open WhatsApp" button.
     }
 
     return { channelResults: results };
@@ -447,11 +460,13 @@ class MessagingService {
     // 3. Channel C: Personal Phone 1-Tap Channel
     if (this.enabledChannels.includes('personal_phone')) {
       results.personal_phone.attempted = true;
-      const personalUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(messageText)}`;
+      const formattedPhone = formatWhatsAppPhone(params.vendorPhone);
+      // Point 52: Use official universal link wa.me to prevent getting stuck in "fetching" web state
+      const personalUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(messageText)}`;
       results.personal_phone.personalUrl = personalUrl;
       results.personal_phone.success = true;
-      dispatchedChannels.push('Personal Phone 1-Tap');
-      this.logMessage('personal_phone', params.vendorPhone, 'success', 0, 'Prepared for 1-tap dispatch');
+      dispatchedChannels.push('Personal Phone 1-Tap (Ready)');
+      // Point 52: Counter is incremented only upon actual button tap
     }
 
     const summaryText =

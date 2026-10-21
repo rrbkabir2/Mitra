@@ -28,11 +28,11 @@ export const MobileNav: React.FC = () => {
     return null;
   }
 
-  const isMoreActive = ['/pricing', '/products-vendors', '/whatsapp-usage', '/settings'].includes(pathname);
+  const isMoreActive = ['/pricing', '/products-vendors', '/whatsapp-usage', '/send-purchase'].includes(pathname);
 
   return (
     <>
-      {/* Point 47: "More" Quick Navigation Sheet for Mobile */}
+      {/* Point 47 & Point 53: "More" Quick Navigation Sheet for Mobile */}
       {showMoreMenu && (
         <div
           style={{
@@ -76,6 +76,28 @@ export const MobileNav: React.FC = () => {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <Link
+                href="/send-purchase"
+                onClick={() => setShowMoreMenu(false)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.85rem',
+                  borderRadius: '14px',
+                  background: pathname === '/send-purchase' ? '#eef7f2' : '#f8fafc',
+                  border: `1.5px solid ${pathname === '/send-purchase' ? '#183d2d' : '#e2e8f0'}`,
+                  color: pathname === '/send-purchase' ? '#183d2d' : '#334155',
+                  textDecoration: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                }}
+                id="mobile-more-purchase"
+              >
+                <ShoppingBag size={18} color="#183d2d" />
+                <span>Send Purchase</span>
+              </Link>
+
               <Link
                 href="/products-vendors"
                 onClick={() => setShowMoreMenu(false)}
@@ -141,28 +163,6 @@ export const MobileNav: React.FC = () => {
                 <MessageSquare size={18} color="#183d2d" />
                 <span>Channel Usage</span>
               </Link>
-
-              <Link
-                href="/settings"
-                onClick={() => setShowMoreMenu(false)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.65rem',
-                  padding: '0.85rem',
-                  borderRadius: '14px',
-                  background: pathname === '/settings' ? '#eef7f2' : '#f8fafc',
-                  border: `1.5px solid ${pathname === '/settings' ? '#183d2d' : '#e2e8f0'}`,
-                  color: pathname === '/settings' ? '#183d2d' : '#334155',
-                  textDecoration: 'none',
-                  fontWeight: 700,
-                  fontSize: '0.88rem',
-                }}
-                id="mobile-more-settings"
-              >
-                <Settings size={18} color="#183d2d" />
-                <span>Settings</span>
-              </Link>
             </div>
 
             <button
@@ -195,7 +195,7 @@ export const MobileNav: React.FC = () => {
         </div>
       )}
 
-      {/* Main Bottom Navigation Bar */}
+      {/* Point 53: Main Bottom Navigation Bar: Home / History / Report / Settings / More */}
       <nav className="mobile-bottom-nav" aria-label="Mobile Navigation" id="mobile-bottom-nav">
         <Link
           href="/"
@@ -216,21 +216,21 @@ export const MobileNav: React.FC = () => {
         </Link>
 
         <Link
-          href="/send-purchase"
-          className={`mobile-nav-item ${pathname === '/send-purchase' ? 'active' : ''}`}
-          id="mobile-nav-purchase"
-        >
-          <ShoppingBag size={20} />
-          <span>Purchase</span>
-        </Link>
-
-        <Link
           href="/reports"
           className={`mobile-nav-item ${pathname === '/reports' ? 'active' : ''}`}
           id="mobile-nav-reports"
         >
           <BarChart3 size={20} />
           <span>Report</span>
+        </Link>
+
+        <Link
+          href="/settings"
+          className={`mobile-nav-item ${pathname === '/settings' ? 'active' : ''}`}
+          id="mobile-nav-settings"
+        >
+          <Settings size={20} />
+          <span>Settings</span>
         </Link>
 
         <button
