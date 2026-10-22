@@ -33,7 +33,10 @@ import {
   Linkedin,
   Github,
   Mail,
+  Copy,
 } from 'lucide-react';
+
+import { APP_VERSION, APP_BUILD, APP_VERSION_DISPLAY, APK_FILENAME, APK_FALLBACK_FILENAME } from '@/lib/version';
 
 import { messagingService, MessagingChannel, ChannelConfig } from '@/lib/messaging';
 import { MessageSquare, CreditCard } from 'lucide-react';
@@ -69,6 +72,16 @@ export default function SettingsPage() {
 
   // Point 41 & 64: Adjustable Font Size & Senior Accessibility (includes 'ultra')
   const [fontSize, setFontSizeState] = useState<'small' | 'default' | 'large' | 'xlarge' | 'ultra'>('default');
+
+  // Point 76: Copy Email Feedback State
+  const [emailCopied, setEmailCopied] = useState(false);
+  const handleCopyEmail = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText('rrbkabir2@gmail.com');
+      setEmailCopied(true);
+      setTimeout(() => setEmailCopied(false), 2000);
+    }
+  };
 
   // Point 55: Delete All Data State & Confirmation Modal
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
@@ -329,7 +342,7 @@ export default function SettingsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.15rem' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#183d2d' }}>Mitra</span>
                   <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#166534', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 700 }}>
-                    Version 1.0 (Latest)
+                    Version {APP_VERSION} (Latest • Build {APP_BUILD})
                   </span>
                 </div>
               </div>
@@ -376,8 +389,8 @@ export default function SettingsPage() {
 
               <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                 <a
-                  href="/downloads/mitra-v1.0.apk"
-                  download="mitra-v1.0.apk"
+                  href={`/downloads/${APK_FILENAME}`}
+                  download={APK_FILENAME}
                   className="btn-primary"
                   style={{
                     width: '100%',
@@ -396,12 +409,12 @@ export default function SettingsPage() {
                   id="btn-download-apk-direct"
                 >
                   <Download size={14} />
-                  <span>Download Mitra APK (v1.0 • 7.2 MB Signed)</span>
+                  <span>Download Mitra APK ({APP_VERSION_DISPLAY} • Signed)</span>
                 </a>
 
                 <a
-                  href="/downloads/mitra-v0.2.apk"
-                  download="mitra-v0.2.apk"
+                  href={`/downloads/${APK_FALLBACK_FILENAME}`}
+                  download={APK_FALLBACK_FILENAME}
                   style={{
                     fontSize: '0.74rem',
                     color: '#64748b',
@@ -411,7 +424,7 @@ export default function SettingsPage() {
                   }}
                   id="link-fallback-apk"
                 >
-                  Download Fallback Build (v0.2)
+                  Download Fallback Build (v1.0)
                 </a>
 
                 <button
@@ -632,72 +645,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* POINT 56: THEME & VISUAL APPEARANCE (SWITCHABLE THEME) */}
-        <section className="content-card" id="section-theme-appearance">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
-            <Sun size={20} color="var(--primary)" />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Theme & Visual Appearance</h3>
-          </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-            Choose your preferred interface theme. Persisted across your sessions and devices.
-          </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem' }}>
-            <button
-              type="button"
-              onClick={() => setTheme('light')}
-              className={`quantity-card ${theme === 'light' ? 'active' : ''}`}
-              style={{
-                padding: '1rem',
-                textAlign: 'left',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.4rem',
-                borderColor: theme === 'light' ? 'var(--primary)' : 'var(--border-glass)',
-                background: theme === 'light' ? 'var(--primary-light)' : 'var(--bg-card)',
-              }}
-              id="btn-theme-light"
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Sun size={22} color="#f59e0b" />
-                {theme === 'light' && <Check size={16} color="var(--primary)" />}
-              </div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                Light Mode
-              </div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                Crisp high-contrast day theme
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTheme('dark')}
-              className={`quantity-card ${theme === 'dark' ? 'active' : ''}`}
-              style={{
-                padding: '1rem',
-                textAlign: 'left',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.4rem',
-                borderColor: theme === 'dark' ? 'var(--primary)' : 'var(--border-glass)',
-                background: theme === 'dark' ? 'var(--primary-light)' : 'var(--bg-card)',
-              }}
-              id="btn-theme-dark"
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Moon size={22} color="#3b82f6" />
-                {theme === 'dark' && <Check size={16} color="var(--primary)" />}
-              </div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                Dark Mode
-              </div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                Deep OLED slate night theme
-              </div>
-            </button>
-          </div>
-        </section>
 
         {/* POINT 41 & POINT 64: COMPACT STEPPER FONT SIZE CONTROLLER */}
         <section className="content-card" id="section-font-size-accessibility">
@@ -1214,7 +1162,7 @@ export default function SettingsPage() {
                 Designed and built Mitra as a permanent, tamper-proof delivery confirmation trust layer between households and local daily suppliers.
               </p>
 
-              {/* Creator Circular Contact Icons */}
+              {/* Creator Circular Contact Icons (Point 75 & Point 76) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '0.85rem' }}>
                 <a
                   href="https://www.linkedin.com/in/kabir-bundele-a2ba81295/"
@@ -1276,12 +1224,96 @@ export default function SettingsPage() {
                     boxShadow: '0 2px 6px rgba(234, 67, 53, 0.3)',
                     transition: 'transform 0.2s ease',
                   }}
-                  title="Send Direct Email"
+                  title="Send Direct Email to rrbkabir2@gmail.com"
                   aria-label="Email"
                   id="link-creator-email"
                 >
                   <Mail size={18} />
                 </a>
+              </div>
+
+              {/* Point 76: Readable email text badge with copy button */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                <a
+                  href="mailto:rrbkabir2@gmail.com"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.35rem 0.65rem',
+                    borderRadius: '8px',
+                    background: 'var(--bg-card-subtle, #f1f5f9)',
+                    border: '1px solid var(--border-glass, #e2e8f0)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    fontFamily: 'var(--font-mono, monospace)',
+                  }}
+                  title="Open mail client for rrbkabir2@gmail.com"
+                  id="link-creator-email-display"
+                >
+                  <Mail size={13} color="#ea4335" />
+                  <span>rrbkabir2@gmail.com</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleCopyEmail}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.35rem 0.6rem',
+                    borderRadius: '8px',
+                    background: emailCopied ? '#dcfce7' : 'transparent',
+                    border: `1px solid ${emailCopied ? '#86efac' : 'var(--border-glass, #e2e8f0)'}`,
+                    color: emailCopied ? '#166534' : 'var(--text-secondary)',
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Copy email address"
+                  id="btn-copy-creator-email"
+                >
+                  {emailCopied ? <Check size={13} color="#166534" /> : <Copy size={13} />}
+                  <span>{emailCopied ? 'Copied!' : 'Copy'}</span>
+                </button>
+              </div>
+
+              {/* Point 69: App Version display in About Me section footer */}
+              <div
+                style={{
+                  marginTop: '1.15rem',
+                  paddingTop: '0.75rem',
+                  borderTop: '1px solid var(--border-glass, #e2e8f0)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <span>Mitra Platform</span>
+                  <span>•</span>
+                  <span style={{ fontWeight: 700, color: '#166534' }}>{APP_VERSION_DISPLAY}</span>
+                  <span>•</span>
+                  <span>Released October 2026</span>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    background: '#dcfce7',
+                    color: '#166534',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '999px',
+                    fontWeight: 700,
+                  }}
+                >
+                  Signed Production Build
+                </span>
               </div>
             </div>
           </div>

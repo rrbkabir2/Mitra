@@ -133,6 +133,17 @@ export function setClientAuthCookie(email: string, forcePersistent?: boolean) {
 }
 
 /**
+ * Initializes/refreshes the browser session active flag and timestamp.
+ */
+export function initializeWebSession() {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(WEB_SESSION_ACTIVE_KEY, 'true');
+    sessionStorage.setItem(WEB_SESSION_LAST_ACTIVE_KEY, Date.now().toString());
+  } catch {}
+}
+
+/**
  * Validates whether the active web session is still fresh and unexpired.
  * Returns false if the browser was closed/reopened or if inactivity exceeded 60 minutes.
  */

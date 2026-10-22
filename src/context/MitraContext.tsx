@@ -24,6 +24,7 @@ import {
   isInstalledMobileOrPWA,
   isWebSessionValid,
   touchUserActivity,
+  initializeWebSession,
 } from '@/lib/auth';
 import { mirrorToMongoApi } from '@/lib/backupClient';
 import { messagingService } from '@/lib/messaging';
@@ -95,10 +96,9 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
         setThemeState(savedTheme);
         document.documentElement.setAttribute('data-theme', savedTheme);
       } else {
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const initial = prefersDark ? 'dark' : 'light';
-        setThemeState(initial);
-        document.documentElement.setAttribute('data-theme', initial);
+        // Point 70: Light mode is strictly DEFAULT unless explicitly chosen
+        setThemeState('light');
+        document.documentElement.setAttribute('data-theme', 'light');
       }
     }
   }, []);
@@ -241,46 +241,48 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
       try {
         const isTrustedApp = isInstalledMobileOrPWA();
 
-        // Web Browser Security Policy:
-        // If not an installed app, verify that the browser/tab session was not closed or expired due to inactivity
-        if (!isTrustedApp && !isWebSessionValid()) {
-          console.log('[Mitra Security] Web session terminated: browser closed or 60m inactivity reached.');
-          clearClientAuthCookie();
-          if (isSupabaseConfigured && supabase) {
-            await supabase.auth.signOut().catch(() => {});
-          }
-          if (isMounted) setIsAdminLoggedIn(false);
-          setIsLoadingAuth(false);
-          return;
-        }
-
-        // Check cookie first
-        const existingCookie = getClientAuthCookie();
-        if (existingCookie && isEmailAllowed(existingCookie)) {
-          if (isMounted) setIsAdminLoggedIn(true);
-          touchUserActivity();
-          // Point 60: Immediately sync canonical live database when logged in via cookie/mobile storage
-          await fetchSupabaseData();
-        }
-
-        // Check Supabase Auth session if configured
+        // Point 72: Check Supabase Auth session first (essential for Google OAuth redirect callback)
         if (isSupabaseConfigured && supabase) {
           try {
             const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user?.email && isEmailAllowed(session.user.email)) {
-              if (isMounted) setIsAdminLoggedIn(true);
-              setClientAuthCookie(session.user.email);
-              touchUserActivity();
-              await fetchSupabaseData();
-            } else if (session?.user?.email && !isEmailAllowed(session.user.email)) {
-              // Unauthorized account
-              await supabase.auth.signOut();
-              clearClientAuthCookie();
-              if (isMounted) setIsAdminLoggedIn(false);
+            if (session?.user?.email) {
+              const email = session.user.email.trim().toLowerCase();
+              if (isEmailAllowed(email)) {
+                if (isMounted) setIsAdminLoggedIn(true);
+                initializeWebSession();
+                setClientAuthCookie(email);
+                touchUserActivity();
+                await fetchSupabaseData();
+                return;
+              } else {
+                // Unauthorized account
+                await supabase.auth.signOut().catch(() => {});
+                clearClientAuthCookie();
+                if (isMounted) setIsAdminLoggedIn(false);
+                return;
+              }
             }
           } catch (e) {
-            console.error('Auth verification error:', e);
+            console.error('Supabase session verification error:', e);
           }
+        }
+
+        // Check persistent cookie if no active Supabase session
+        const existingCookie = getClientAuthCookie();
+        if (existingCookie && isEmailAllowed(existingCookie)) {
+          // Web Browser Security Policy:
+          // If in web browser, verify that the browser/tab session was not closed or expired due to inactivity
+          if (!isTrustedApp && !isWebSessionValid()) {
+            console.log('[Mitra Security] Web session terminated: browser closed or 60m inactivity reached.');
+            clearClientAuthCookie();
+            if (isMounted) setIsAdminLoggedIn(false);
+            return;
+          }
+          if (isMounted) setIsAdminLoggedIn(true);
+          touchUserActivity();
+          await fetchSupabaseData();
+        } else {
+          if (isMounted) setIsAdminLoggedIn(false);
         }
       } catch (e) {
         console.error('Auth verification top-level error:', e);

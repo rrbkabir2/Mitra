@@ -67,46 +67,55 @@
    POINT 56: COMPREHENSIVE DARK THEME DESIGN TOKENS
    Deep rich slate, high-contrast readable typography, glowing accents
    ========================================================================== */
+/* ==========================================================================
+   POINT 70: REDESIGNED DARK THEME DESIGN TOKENS
+   Neutral dark charcoal/obsidian tones paired consistently with Mitra's genuine green brand accent
+   ========================================================================== */
 [data-theme="dark"] {
-  --bg-main: #0b1120;
-  --bg-card: #131c2e;
-  --bg-card-subtle: #1e293b;
-  --bg-glass: rgba(19, 28, 46, 0.90);
-  --border-glass: rgba(51, 65, 85, 0.7);
+  --bg-main: #121413;
+  --bg-card: #181b18;
+  --bg-card-subtle: #222622;
+  --bg-glass: rgba(24, 27, 24, 0.92);
+  --border-glass: rgba(255, 255, 255, 0.08);
 
-  --primary: #3b82f6;
-  --primary-hover: #60a5fa;
-  --primary-light: #1e293b;
-  --primary-glow: rgba(59, 130, 246, 0.25);
+  --primary: #22c55e;
+  --primary-hover: #16a34a;
+  --primary-light: rgba(34, 197, 94, 0.14);
+  --primary-glow: rgba(34, 197, 94, 0.25);
 
-  --dairy-cream: #1e293b;
+  --dairy-cream: #1e241f;
   --dairy-gold: #fbbf24;
   --dairy-gold-dark: #f59e0b;
 
   --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --text-inverse: #0b1120;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --text-inverse: #121413;
 
-  --status-confirmed: #10b981;
-  --status-confirmed-bg: rgba(16, 185, 129, 0.15);
+  --status-confirmed: #22c55e;
+  --status-confirmed-bg: rgba(34, 197, 94, 0.16);
   --status-pending: #f59e0b;
-  --status-pending-bg: rgba(245, 158, 11, 0.15);
+  --status-pending-bg: rgba(245, 158, 11, 0.16);
   --status-denied: #ef4444;
-  --status-denied-bg: rgba(239, 68, 68, 0.15);
-  --status-absent: #94a3b8;
-  --status-absent-bg: rgba(148, 163, 184, 0.15);
+  --status-denied-bg: rgba(239, 68, 68, 0.16);
+  --status-absent: #9ca3af;
+  --status-absent-bg: rgba(156, 163, 175, 0.16);
   --status-auto: #a855f7;
-  --status-auto-bg: rgba(168, 85, 247, 0.15);
+  --status-auto-bg: rgba(168, 85, 247, 0.16);
 
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
 }
 
 [data-theme="dark"] .mitra-app {
-  background: radial-gradient(circle at 10% 20%, rgba(15, 23, 42, 0.9) 0%, rgba(11, 17, 32, 1) 90%);
+  background: radial-gradient(circle at 50% 0%, #1c221e 0%, #121413 65%, #0c0e0d 100%);
+}
+
+[data-theme="dark"] .mitra-header {
+  background: rgba(24, 27, 24, 0.92);
+  border-bottom-color: #272d28;
 }
 
 [data-theme="dark"] .content-card,
@@ -115,7 +124,7 @@
 [data-theme="dark"] .modal-sheet,
 [data-theme="dark"] .quantity-card {
   background: var(--bg-card);
-  border-color: rgba(51, 65, 85, 0.8);
+  border-color: #272d28;
   color: var(--text-primary);
 }
 
@@ -123,72 +132,72 @@
 [data-theme="dark"] .form-select,
 [data-theme="dark"] .form-textarea,
 [data-theme="dark"] .stepper-input {
-  background: #1e293b;
+  background: #202421;
   color: #f8fafc;
-  border-color: #334155;
+  border-color: #2f3730;
 }
 
 [data-theme="dark"] .form-input:focus,
 [data-theme="dark"] .form-select:focus,
 [data-theme="dark"] .form-textarea:focus {
   border-color: var(--primary);
-  background: #1e293b;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  background: #202421;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
 }
 
 [data-theme="dark"] .form-label {
-  color: #cbd5e1;
+  color: #d1d5db;
 }
 
 [data-theme="dark"] .btn-secondary {
-  background: #1e293b;
+  background: #202421;
   color: #f8fafc;
-  border-color: #334155;
+  border-color: #2f3730;
 }
 
 [data-theme="dark"] .btn-secondary:hover {
-  background: #334155;
+  background: #2b322c;
   color: #ffffff;
 }
 
 [data-theme="dark"] .mobile-bottom-nav {
-  background: rgba(19, 28, 46, 0.95);
-  border-top-color: rgba(51, 65, 85, 0.8);
+  background: rgba(24, 27, 24, 0.95);
+  border-top-color: #272d28;
 }
 
 [data-theme="dark"] .mobile-nav-item {
-  color: #94a3b8;
+  color: #9ca3af;
 }
 
 [data-theme="dark"] .mobile-nav-item.active {
-  color: #60a5fa;
+  color: #22c55e;
 }
 
 [data-theme="dark"] .filter-pill-btn {
-  background: #1e293b;
-  color: #cbd5e1;
-  border-color: #334155;
+  background: #202421;
+  color: #d1d5db;
+  border-color: #2f3730;
 }
 
 [data-theme="dark"] .filter-pill-btn.active {
-  background: #2563eb;
+  background: #16a34a;
   color: #ffffff;
-  border-color: #2563eb;
+  border-color: #22c55e;
 }
 
 [data-theme="dark"] .figma-feature-header {
-  background: #131c2e;
-  border-color: #334155;
+  background: #181b18;
+  border-color: #272d28;
 }
 
 [data-theme="dark"] .figma-feature-header:hover {
-  background: #1e293b;
+  background: #202421;
 }
 
 [data-theme="dark"] .figma-feature-icon-circle {
-  background: #1e293b;
-  border-color: #3b82f6;
-  color: #60a5fa;
+  background: #202421;
+  border-color: #22c55e;
+  color: #22c55e;
 }
 
 [data-theme="dark"] .figma-feature-text h3 {
@@ -196,28 +205,28 @@
 }
 
 [data-theme="dark"] .figma-feature-body {
-  background: #0f172a;
-  border-color: #334155;
+  background: #141715;
+  border-color: #272d28;
 }
 
 [data-theme="dark"] .ledger-row-card {
-  background: #131c2e;
-  border-color: #334155;
+  background: #181b18;
+  border-color: #272d28;
 }
 
 [data-theme="dark"] .ledger-row-card:hover {
-  background: #1e293b;
-  border-color: #3b82f6;
+  background: #202421;
+  border-color: #22c55e;
 }
 
 [data-theme="dark"] .stepper-btn {
-  background: #1e293b;
-  border-color: #334155;
+  background: #202421;
+  border-color: #2f3730;
   color: #f8fafc;
 }
 
 [data-theme="dark"] .stepper-btn:hover {
-  background: #334155;
+  background: #2b322c;
 }
 
 * {
@@ -351,7 +360,53 @@ input[type='number'] {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+/* Dedicated prominent logout button (Point 71) */
+.header-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.header-logout-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .header-logout-btn {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .header-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.26);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .header-logout-btn .logout-text {
+    display: none;
+  }
+  .header-logout-btn {
+    padding: 0.45rem 0.55rem;
+  }
 }
 
 /* Language Switcher */
@@ -382,7 +437,7 @@ input[type='number'] {
 /* Desktop Navigation */
 .desktop-nav {
   display: none;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 @media (min-width: 900px) {
@@ -392,13 +447,24 @@ input[type='number'] {
   }
 }
 
+@media (min-width: 900px) and (max-width: 1240px) {
+  .desktop-nav {
+    gap: 0.2rem;
+  }
+  .nav-link {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.78rem;
+    gap: 0.3rem;
+  }
+}
+
 .nav-link {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.5rem 0.85rem;
+  padding: 0.5rem 0.8rem;
   border-radius: var(--radius-md);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 600;
   color: var(--text-secondary);
   transition: all var(--transition-fast);

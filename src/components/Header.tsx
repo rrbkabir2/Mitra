@@ -35,7 +35,7 @@ export const Header: React.FC = () => {
             <MilkBottleIcon size={24} fillColor="#ffffff" />
           </div>
           <div className="brand-title-group">
-            <h1 style={{ fontSize: '1.25rem', lineHeight: '1.15', fontWeight: 800, color: '#183d2d', letterSpacing: '-0.02em', background: 'none', WebkitTextFillColor: 'initial' }}>
+            <h1 style={{ fontSize: '1.25rem', lineHeight: '1.15', fontWeight: 800, color: theme === 'dark' ? '#f8fafc' : '#183d2d', letterSpacing: '-0.02em', background: 'none', WebkitTextFillColor: 'initial' }}>
               Mitra
             </h1>
             <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
@@ -127,7 +127,7 @@ export const Header: React.FC = () => {
             <MilkBottleIcon size={24} fillColor="#ffffff" />
           </div>
           <div className="brand-title-group">
-            <h1 style={{ fontSize: '1.25rem', lineHeight: '1.15', fontWeight: 800, color: '#183d2d', letterSpacing: '-0.02em', background: 'none', WebkitTextFillColor: 'initial' }}>
+            <h1 style={{ fontSize: '1.25rem', lineHeight: '1.15', fontWeight: 800, color: theme === 'dark' ? '#f8fafc' : '#183d2d', letterSpacing: '-0.02em', background: 'none', WebkitTextFillColor: 'initial' }}>
               Mitra
             </h1>
             <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
@@ -189,13 +189,13 @@ export const Header: React.FC = () => {
         </button>
 
         <div className="lang-selector" title="Change Language" style={{ borderRadius: '10px' }}>
-          <Globe size={14} color="#183d2d" />
+          <Globe size={14} color={theme === 'dark' ? '#9ca3af' : '#183d2d'} />
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
             aria-label="Select Language"
             id="global-lang-select"
-            style={{ color: '#183d2d', fontWeight: 600 }}
+            style={{ color: theme === 'dark' ? '#f8fafc' : '#183d2d', fontWeight: 600 }}
           >
             <option value="en">English</option>
             <option value="hi">हिंदी (Hindi)</option>
@@ -203,25 +203,18 @@ export const Header: React.FC = () => {
           </select>
         </div>
 
-        <Link
-          href="/"
-          className="btn-secondary"
-          style={{ padding: '0.45rem', borderRadius: '10px', color: '#183d2d', border: '1px solid #e5e7eb' }}
-          title="Home"
-          id="btn-header-home"
-        >
-          <Home size={18} />
-        </Link>
-
+        {/* Point 71: Dedicated, clearly visible Logout button */}
         {isAdminLoggedIn && (
           <button
+            type="button"
             onClick={logoutAdmin}
-            className="btn-secondary"
-            style={{ padding: '0.45rem', borderRadius: '10px', fontSize: '0.8rem' }}
+            className="header-logout-btn"
             title={t.nav.logout}
+            aria-label="Logout"
             id="btn-admin-logout"
           >
-            <LogOut size={16} />
+            <LogOut size={15} />
+            <span className="logout-text">{t.nav.logout}</span>
           </button>
         )}
       </div>

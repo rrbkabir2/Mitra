@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { isEmailAllowed, setClientAuthCookie, clearClientAuthCookie } from '@/lib/auth';
+import { isEmailAllowed, setClientAuthCookie, clearClientAuthCookie, initializeWebSession, touchUserActivity } from '@/lib/auth';
 import { MilkBottleIcon } from '@/components/MilkBottleIcon';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 
@@ -81,7 +81,9 @@ export default function AuthCallbackPage() {
 
       if (isAuthorized) {
         // Authorized administrator!
+        initializeWebSession();
         setClientAuthCookie(normalizedEmail);
+        touchUserActivity();
         if (typeof window !== 'undefined') {
           window.location.href = '/';
         } else {

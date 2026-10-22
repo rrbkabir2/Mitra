@@ -46,10 +46,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                var theme = localStorage.getItem('mitra_theme');
-                if (!theme) {
-                  theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                }
+                var theme = localStorage.getItem('mitra_theme') || 'light';
                 document.documentElement.setAttribute('data-theme', theme);
                 var fontSize = localStorage.getItem('mitra_font_size');
                 if (fontSize) {

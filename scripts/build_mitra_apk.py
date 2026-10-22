@@ -151,25 +151,43 @@ def verify_badging(aapt2_exe, signed_apk):
         if mipmap_section and ('resource ' in line or '(' in line):
             print(f'   {line.strip()}')
 
+def get_app_version():
+    version_file = os.path.abspath('src/lib/version.ts')
+    version = '1.1'
+    build = 2
+    if os.path.exists(version_file):
+        with open(version_file, 'r', encoding='utf-8') as f:
+            v_content = f.read()
+        m_ver = re.search(r"APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]", v_content)
+        m_bld = re.search(r"APP_BUILD\s*=\s*(\d+)", v_content)
+        if m_ver:
+            version = m_ver.group(1)
+        if m_bld:
+            build = int(m_bld.group(1))
+    return version, build
+
 def deploy_apk(signed_apk):
     downloads_dir = 'public/downloads'
     os.makedirs(downloads_dir, exist_ok=True)
-    out_v1_0 = os.path.join(downloads_dir, 'mitra-v1.0.apk')
+    version, build = get_app_version()
+    current_apk = f'mitra-v{version}.apk'
+    out_current = os.path.join(downloads_dir, current_apk)
     
-    shutil.copyfile(signed_apk, out_v1_0)
+    shutil.copyfile(signed_apk, out_current)
     
-    # Point 44: Keep only current (v1.0) + one previous fallback (v0.2). Delete v0.1 and all .idsig files.
+    # Point 69 & Point 44: Keep current release (e.g. mitra-v1.1.apk) + immediate fallback (mitra-v1.0.apk)
+    fallback_apk = 'mitra-v1.0.apk'
     for fname in os.listdir(downloads_dir):
         fpath = os.path.join(downloads_dir, fname)
-        if fname.endswith('.idsig') or fname == 'mitra-v0.1.apk':
+        if fname.endswith('.idsig') or (fname.startswith('mitra-') and fname not in [current_apk, fallback_apk]):
             try:
                 os.remove(fpath)
                 print(f'[Mitra APK Builder] Cleaned up legacy file: {fname}')
             except Exception as e:
                 print(f'[Mitra APK Builder] Could not remove {fname}: {e}')
                 
-    size_mb = os.path.getsize(out_v1_0) / (1024 * 1024)
-    print(f'[Mitra APK Builder] Successfully deployed genuine branded APK to {out_v1_0} ({size_mb:.2f} MB)!')
+    size_mb = os.path.getsize(out_current) / (1024 * 1024)
+    print(f'[Mitra APK Builder] Successfully deployed genuine branded APK to {out_current} ({size_mb:.2f} MB)!')
 
 def check_attached_devices(adb_exe, signed_apk):
     print('[Mitra APK Builder] Checking for attached Android devices...')

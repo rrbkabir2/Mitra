@@ -50,11 +50,12 @@ export const MobileNav: React.FC = () => {
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--bg-card, #ffffff)',
               borderTopLeftRadius: '22px',
               borderTopRightRadius: '22px',
+              borderTop: '1px solid var(--border-glass, #e2e8f0)',
               padding: '1.25rem 1.25rem 2rem 1.25rem',
-              boxShadow: '0 -10px 30px rgba(0,0,0,0.2)',
+              boxShadow: '0 -10px 30px rgba(0,0,0,0.3)',
               maxWidth: '500px',
               margin: '0 auto',
               width: '100%',
@@ -62,13 +63,13 @@ export const MobileNav: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#183d2d' }}>
+              <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                 All App Sections
               </span>
               <button
                 type="button"
                 onClick={() => setShowMoreMenu(false)}
-                style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0.25rem' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem' }}
                 aria-label="Close menu"
               >
                 <X size={20} />
@@ -85,16 +86,16 @@ export const MobileNav: React.FC = () => {
                   gap: '0.65rem',
                   padding: '0.85rem',
                   borderRadius: '14px',
-                  background: pathname === '/send-purchase' ? '#eef7f2' : '#f8fafc',
-                  border: `1.5px solid ${pathname === '/send-purchase' ? '#183d2d' : '#e2e8f0'}`,
-                  color: pathname === '/send-purchase' ? '#183d2d' : '#334155',
+                  background: pathname === '/send-purchase' ? 'var(--primary-light)' : 'var(--bg-card-subtle, #f8fafc)',
+                  border: `1.5px solid ${pathname === '/send-purchase' ? 'var(--primary)' : 'var(--border-glass, #e2e8f0)'}`,
+                  color: pathname === '/send-purchase' ? 'var(--primary)' : 'var(--text-primary)',
                   textDecoration: 'none',
                   fontWeight: 700,
                   fontSize: '0.88rem',
                 }}
                 id="mobile-more-purchase"
               >
-                <ShoppingBag size={18} color="#183d2d" />
+                <ShoppingBag size={18} color="var(--primary)" />
                 <span>Send Purchase</span>
               </Link>
 
@@ -107,16 +108,16 @@ export const MobileNav: React.FC = () => {
                   gap: '0.65rem',
                   padding: '0.85rem',
                   borderRadius: '14px',
-                  background: pathname === '/products-vendors' ? '#eef7f2' : '#f8fafc',
-                  border: `1.5px solid ${pathname === '/products-vendors' ? '#183d2d' : '#e2e8f0'}`,
-                  color: pathname === '/products-vendors' ? '#183d2d' : '#334155',
+                  background: pathname === '/products-vendors' ? 'var(--primary-light)' : 'var(--bg-card-subtle, #f8fafc)',
+                  border: `1.5px solid ${pathname === '/products-vendors' ? 'var(--primary)' : 'var(--border-glass, #e2e8f0)'}`,
+                  color: pathname === '/products-vendors' ? 'var(--primary)' : 'var(--text-primary)',
                   textDecoration: 'none',
                   fontWeight: 700,
                   fontSize: '0.88rem',
                 }}
                 id="mobile-more-vendors"
               >
-                <Users size={18} color="#183d2d" />
+                <Users size={18} color="var(--primary)" />
                 <span>Vendors & Products</span>
               </Link>
 
@@ -129,16 +130,16 @@ export const MobileNav: React.FC = () => {
                   gap: '0.65rem',
                   padding: '0.85rem',
                   borderRadius: '14px',
-                  background: pathname === '/pricing' ? '#eef7f2' : '#f8fafc',
-                  border: `1.5px solid ${pathname === '/pricing' ? '#183d2d' : '#e2e8f0'}`,
-                  color: pathname === '/pricing' ? '#183d2d' : '#334155',
+                  background: pathname === '/pricing' ? 'var(--primary-light)' : 'var(--bg-card-subtle, #f8fafc)',
+                  border: `1.5px solid ${pathname === '/pricing' ? 'var(--primary)' : 'var(--border-glass, #e2e8f0)'}`,
+                  color: pathname === '/pricing' ? 'var(--primary)' : 'var(--text-primary)',
                   textDecoration: 'none',
                   fontWeight: 700,
                   fontSize: '0.88rem',
                 }}
                 id="mobile-more-pricing"
               >
-                <IndianRupee size={18} color="#183d2d" />
+                <IndianRupee size={18} color="var(--primary)" />
                 <span>Rate & Pricing</span>
               </Link>
 
@@ -151,16 +152,16 @@ export const MobileNav: React.FC = () => {
                   gap: '0.65rem',
                   padding: '0.85rem',
                   borderRadius: '14px',
-                  background: pathname === '/whatsapp-usage' ? '#eef7f2' : '#f8fafc',
-                  border: `1.5px solid ${pathname === '/whatsapp-usage' ? '#183d2d' : '#e2e8f0'}`,
-                  color: pathname === '/whatsapp-usage' ? '#183d2d' : '#334155',
+                  background: pathname === '/whatsapp-usage' ? 'var(--primary-light)' : 'var(--bg-card-subtle, #f8fafc)',
+                  border: `1.5px solid ${pathname === '/whatsapp-usage' ? 'var(--primary)' : 'var(--border-glass, #e2e8f0)'}`,
+                  color: pathname === '/whatsapp-usage' ? 'var(--primary)' : 'var(--text-primary)',
                   textDecoration: 'none',
                   fontWeight: 700,
                   fontSize: '0.88rem',
                 }}
                 id="mobile-more-usage"
               >
-                <MessageSquare size={18} color="#183d2d" />
+                <MessageSquare size={18} color="var(--primary)" />
                 <span>Channel Usage</span>
               </Link>
             </div>
@@ -179,9 +180,9 @@ export const MobileNav: React.FC = () => {
                 gap: '0.5rem',
                 padding: '0.75rem',
                 borderRadius: '12px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#b91c1c',
+                background: 'rgba(239, 68, 68, 0.14)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#ef4444',
                 fontWeight: 700,
                 fontSize: '0.88rem',
                 cursor: 'pointer',

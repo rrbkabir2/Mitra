@@ -635,14 +635,14 @@ python scripts/build_mitra_apk.py
 java -jar tools/apktool.jar b scripts/apk_src -o scripts/mitra-unsigned.apk --use-aapt2 --aapt tools/aapt2.exe
 # c) Zipaligns and signs with release keystore (v1, v2, v3 Android signature schemes):
 java -jar tools/uber-apk-signer.jar -a scripts/mitra-signed.apk --ks scripts/mitra-release.keystore --ksAlias mitra --ksPass generic_pass --allowResign --overwrite
-# d) Deploys verified APK to: public/downloads/mitra-v1.0.apk
+# d) Deploys verified APK to: public/downloads/mitra-v1.1.apk
 ```
 
 ---
 
-## 8. Complete Chronological Development Fix Log (Points 1 – 55)
+## 8. Complete Chronological Development Fix Log (Points 1 – 76)
 
-The following 55 engineering fixes and enhancements represent the complete development history of Mitra.
+The following 76 engineering fixes and enhancements represent the complete development history of Mitra.
 
 1. **Brand Wordmark & Household Identity**: Replaced generic headers with the custom Mitra milk-bottle emblem and dynamic household name.
 2. **Strict Admin Authentication Gating**: Protected all operational views and API routes behind verified admin session cookies.
@@ -737,7 +737,29 @@ The following 55 engineering fixes and enhancements represent the complete devel
 67. **Sample Delivery UI Removal from Live Settings Page**:
     - Cleaned up the live Settings page by removing the sample delivery history section, keeping `supabase/sample_delivery_seed.sql` as the standalone external backup.
 68. **Creator "About Me" Section**:
-    - Added an About Me footer introducing app creator Kabir Bundele, featuring a circular GitHub avatar (`https://github.com/rrbbu.png`) and circular icon links to LinkedIn, GitHub, and contact email (`creator@example.com`).
+    - Added an About Me footer introducing app creator Kabir Bundele, featuring a circular GitHub avatar (`https://github.com/rrbkabir2.png`) and circular icon links to LinkedIn, GitHub, and contact email.
+69. **Automated Versioning System & Multi-Release Bumping**:
+    - Established centralized `src/lib/version.ts` single source of truth (`APP_VERSION = '1.1'`, `APP_BUILD = 2`) and updated `package.json` to `1.1.0`.
+    - Wired version metadata into `setup_apk_resources.py` and `build_mitra_apk.py` to auto-bump `apktool.yml` (`versionCode: 2`, `versionName: '1.1'`) and package versioned APK binaries (`mitra-v1.1.apk`) while preserving `mitra-v1.0.apk` as fallback.
+    - Displayed active version badges in Settings and About Me footer.
+70. **Dark Mode Visual Redesign & Light Mode Default**:
+    - Redesigned `[data-theme="dark"]` using neutral dark obsidian/charcoal tones (`#121413`, cards `#181b18`, inputs `#202421`) paired consistently with Mitra's genuine green brand accent (`#22c55e`, `#16a34a`).
+    - Enforced Light Mode as the strict DEFAULT theme for all new sessions by eliminating automatic OS dark mode overrides.
+71. **Dedicated High-Visibility Top Navigation Logout Button**:
+    - Added a dedicated, prominent `.header-logout-btn` with icon + text in soft red tint (`#fef2f2`, `#b91c1c` / dark mode `rgba(239, 68, 68, 0.16)`) directly in the header action bar across all viewports.
+    - Removed redundant Home button and added responsive styling ensuring the logout option is never squeezed off-screen or cut off on smaller displays.
+72. **Google Sign-In Callback Race Condition Fix**:
+    - Prioritized `supabase.auth.getSession()` check before web session inactivity timeout in `MitraContext.tsx`.
+    - Initialized web session activity flags before redirecting in `auth/callback/page.tsx`, eliminating premature sign-outs when returning from Google OAuth.
+73. **Developer Console Toast Removal from Android WebView**:
+    - Removed `Toast.makeText` debug log rendering in `MainActivity$6.smali`'s `onConsoleMessage` and updated `setup_apk_resources.py` with `"console_log": False` and automatic smali patching, ensuring internal console logs never appear as floating toasts in live user builds.
+74. **Settings Page Theme Deduplication**:
+    - Removed the redundant in-Settings "Theme & Visual Appearance" card, keeping the top navigation sun/moon button as the single intuitive toggle for light/dark mode.
+75. **LinkedIn Profile Clean URL Verification**:
+    - Verified and sanitized creator LinkedIn link to clean public format `https://www.linkedin.com/in/kabir-bundele-a2ba81295/` with `target="_blank"` and `rel="noopener noreferrer"`.
+76. **Visible Email Address Display & Direct Mailto Launch**:
+    - Added a visible readable badge displaying the actual email address (`rrbkabir2@gmail.com`) alongside a 1-tap copy button with instant "Copied!" feedback.
+    - Ensured the mailto action reliably launches the user's default email client across mobile devices and desktop browsers.
 
 ---
 

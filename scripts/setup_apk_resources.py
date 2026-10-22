@@ -157,8 +157,8 @@ def setup_resources():
             ["path", "endsWith", ".epub"],
             ["query", "contains", "type=epub"]
         ],
-        "remote_debug": True,
-        "console_log": True,
+        "remote_debug": False,
+        "console_log": False,
         "js_interface": True,
         "context_menu": False,
         "not_matching": True,
@@ -311,5 +311,41 @@ def setup_resources():
                 f.write(fp_content)
         print('Verified filepaths.xml cache and internal paths.')
 
+    # 9. Ensure Toast is removed from MainActivity$6.smali
+    m6_path = os.path.join(src_dir, 'smali', 'net', 'mikespub', 'mywebview', 'MainActivity$6.smali')
+    if os.path.exists(m6_path):
+        with open(m6_path, 'r', encoding='utf-8') as f:
+            m6_content = f.read()
+        if 'Toast;->makeText' in m6_content:
+            m6_content = re.sub(r'invoke-static.*?Toast;->makeText.*?Toast;->show\(\)V\s*', '', m6_content, flags=re.DOTALL)
+            with open(m6_path, 'w', encoding='utf-8') as f:
+                f.write(m6_content)
+            print('Removed console Toast from MainActivity$6.smali.')
+
+    # 10. Update apktool.yml with dynamic versioning from src/lib/version.ts (Point 69)
+    version_file = os.path.abspath('src/lib/version.ts')
+    version = '1.1'
+    build = 2
+    if os.path.exists(version_file):
+        with open(version_file, 'r', encoding='utf-8') as f:
+            v_content = f.read()
+        m_ver = re.search(r"APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]", v_content)
+        m_bld = re.search(r"APP_BUILD\s*=\s*(\d+)", v_content)
+        if m_ver:
+            version = m_ver.group(1)
+        if m_bld:
+            build = int(m_bld.group(1))
+
+    apktool_yml_path = os.path.join(src_dir, 'apktool.yml')
+    if os.path.exists(apktool_yml_path):
+        with open(apktool_yml_path, 'r', encoding='utf-8') as f:
+            yml_content = f.read()
+        yml_content = re.sub(r'versionCode:\s*.*', f'versionCode: {build}', yml_content)
+        yml_content = re.sub(r'versionName:\s*.*', f"versionName: '{version}'", yml_content)
+        with open(apktool_yml_path, 'w', encoding='utf-8') as f:
+            f.write(yml_content)
+        print(f'Updated apktool.yml to versionCode: {build}, versionName: {version}')
+
 if __name__ == '__main__':
     setup_resources()
+
