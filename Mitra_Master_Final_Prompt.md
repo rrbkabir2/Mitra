@@ -707,6 +707,37 @@ The following 55 engineering fixes and enhancements represent the complete devel
 55. **Settings "Delete All Data" Button with Confirmation**:
     - Created `/api/admin/clear-data` and a prominent red button in Settings with a confirmation modal.
     - Safely wipes all operational records (delivery entries, history, purchases, channel logs) while strictly preserving administrator accounts, login credentials, and household configurations.
+56. **App-Wide Dark / Light Mode Switchable Theme**:
+    - Implemented a complete OLED slate dark palette (`[data-theme="dark"]`) across the entire platform with zero white flash on page load.
+    - Added 1-tap Moon/Sun toggle in the main header and a persistent radio selector in Settings (System, Light, Dark).
+57. **Price Management Milk Types Simplification**:
+    - Streamlined milk options strictly down to Cow Milk and Buffalo Milk, removing extra branded variants while preserving all historical price change audit trails and approval statuses.
+58. **Active Channel Verification & Accurate Vendor Mapping**:
+    - Fixed channel-selection bug in Send Purchase and Delivery entry flows: strict verification that channels are BOTH user-enabled and configured (`getActiveChannels()`).
+    - Fixed vendor mapping so dispatches strictly address the selected vendor's phone number without defaulting to unrelated vendors.
+59. **Editable Recipient Mobile Number for Test Sends**:
+    - Added an editable mobile number input field in `/whatsapp-usage` with quick autofill chips (`Self / Personal`, `Father / Vendor 1`, `Mother / Vendor 2`).
+    - Allows genuine end-to-end receipt testing across 1-tap WhatsApp (`wa.me`), Meta Cloud API, and Fast2SMS.
+60. **Cross-Device Sync & Direct Server-Side Sync API**:
+    - Added `/api/sync` service-role endpoint and automatic synchronization on window focus, visibility change, and route navigation to eliminate data discrepancies between web and APK.
+61. **Genuine Google OAuth Integration**:
+    - Removed non-functional placeholder modal from `/login`. Integrated real Supabase Google OAuth (`signInWithOAuth` with `prompt=select_account`) and PKCE code exchange in `/auth/callback` with administrator allowlist validation.
+62. **Privacy Protection on Password Reset**:
+    - Replaced real email address in Reset / Forgot Password placeholder with generic `demo@example.com` to prevent privacy leaks on shared or demo devices.
+63. **End-to-End OTP-Based Password Reset**:
+    - Whitelisted `/api/auth/forgot-password` in Next.js middleware, allowing unauthenticated administrators to request OTP verification codes and reset their password securely without hitting 401 Unauthorized errors.
+64. **Compact Font Size Stepper & Ultra Extra Large Tier**:
+    - Redesigned font size selector in Settings into a compact `[-] [Size Label] [+]` stepper widget for superior mobile ergonomics, and added top-tier "Ultra Extra Large" (`ultra` / 22px).
+65. **Android APK Camera Capture & Photo Picker Parity**:
+    - Implemented `WebChromeClient.onShowFileChooser` in Android WebView smali code, delegating to Android system `Intent.createChooser` with `MediaStore.ACTION_IMAGE_CAPTURE` and `ACTION_GET_CONTENT`.
+    - Configured `FileProvider` paths and manifest permissions (`CAMERA`, `WRITE_EXTERNAL_STORAGE`) so "Take Photo" and "Choose Photo" work identically inside the APK.
+66. **100% Web-to-APK Functional Parity Directive**:
+    - Added WebView `DownloadListener` to route file downloads (PDFs, text statements, APK updates) to Android's native Download Manager with status bar notifications.
+    - Set `not_matching: True` in APK asset configuration so external WhatsApp (`wa.me`), mailto, tel, LinkedIn, and GitHub links open seamlessly in native apps.
+67. **Sample Delivery UI Removal from Live Settings Page**:
+    - Cleaned up the live Settings page by removing the sample delivery history section, keeping `supabase/sample_delivery_seed.sql` as the standalone external backup.
+68. **Creator "About Me" Section**:
+    - Added an About Me footer introducing app creator Kabir Bundele, featuring a circular GitHub avatar (`https://github.com/rrbbu.png`) and circular icon links to LinkedIn, GitHub, and contact email (`creator@example.com`).
 
 ---
 
