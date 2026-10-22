@@ -17,12 +17,14 @@ import {
   Globe,
   LogOut,
   Home,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { Language } from '@/types';
 
 export const Header: React.FC = () => {
   const pathname = usePathname();
-  const { t, language, setLanguage, logoutAdmin, isAdminLoggedIn, household } = useMitra();
+  const { t, language, setLanguage, logoutAdmin, isAdminLoggedIn, household, theme, toggleTheme } = useMitra();
 
   // Point 35: On login page or unauthenticated state, render minimal pre-login header (no nav items)
   if (pathname === '/login' || (!isAdminLoggedIn && !pathname.startsWith('/v/'))) {
@@ -42,6 +44,19 @@ export const Header: React.FC = () => {
           </div>
         </div>
         <div className="header-actions">
+          {/* Point 56: Theme Switcher */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="btn-secondary"
+            style={{ padding: '0.45rem', borderRadius: '10px', color: theme === 'dark' ? '#fbbf24' : '#183d2d', border: '1px solid var(--border-glass)' }}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle theme"
+            id="btn-login-theme-toggle"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+
           <div className="lang-selector" title="Change Language" style={{ borderRadius: '10px' }}>
             <Globe size={14} color="#183d2d" />
             <select
@@ -74,18 +89,31 @@ export const Header: React.FC = () => {
             <span>Vendor Confirmation Portal</span>
           </div>
         </div>
-        <div className="lang-selector">
-          <Globe size={14} color="#64748b" />
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as Language)}
-            aria-label="Select Language"
-            id="vendor-lang-select"
+        <div className="header-actions">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="btn-secondary"
+            style={{ padding: '0.45rem', borderRadius: '10px', color: theme === 'dark' ? '#fbbf24' : '#183d2d', border: '1px solid var(--border-glass)' }}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle theme"
+            id="btn-vendor-theme-toggle"
           >
-            <option value="en">English</option>
-            <option value="hi">हिंदी (Hindi)</option>
-            <option value="mr">मराठी (Marathi)</option>
-          </select>
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <div className="lang-selector">
+            <Globe size={14} color="#64748b" />
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as Language)}
+              aria-label="Select Language"
+              id="vendor-lang-select"
+            >
+              <option value="en">English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="mr">मराठी (Marathi)</option>
+            </select>
+          </div>
         </div>
       </header>
     );
@@ -145,8 +173,21 @@ export const Header: React.FC = () => {
         </Link>
       </nav>
 
-      {/* Header Actions (Language & Logout) */}
+      {/* Header Actions (Language, Theme, Home & Logout) */}
       <div className="header-actions">
+        {/* Point 56: Theme Toggle Button */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="btn-secondary"
+          style={{ padding: '0.45rem', borderRadius: '10px', color: theme === 'dark' ? '#fbbf24' : '#183d2d', border: '1px solid var(--border-glass)' }}
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          aria-label="Toggle theme"
+          id="btn-header-theme-toggle"
+        >
+          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+        </button>
+
         <div className="lang-selector" title="Change Language" style={{ borderRadius: '10px' }}>
           <Globe size={14} color="#183d2d" />
           <select

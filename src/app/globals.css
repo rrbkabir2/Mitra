@@ -63,13 +63,170 @@
   --transition-bounce: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ==========================================================================
+   POINT 56: COMPREHENSIVE DARK THEME DESIGN TOKENS
+   Deep rich slate, high-contrast readable typography, glowing accents
+   ========================================================================== */
+[data-theme="dark"] {
+  --bg-main: #0b1120;
+  --bg-card: #131c2e;
+  --bg-card-subtle: #1e293b;
+  --bg-glass: rgba(19, 28, 46, 0.90);
+  --border-glass: rgba(51, 65, 85, 0.7);
+
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-light: #1e293b;
+  --primary-glow: rgba(59, 130, 246, 0.25);
+
+  --dairy-cream: #1e293b;
+  --dairy-gold: #fbbf24;
+  --dairy-gold-dark: #f59e0b;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-inverse: #0b1120;
+
+  --status-confirmed: #10b981;
+  --status-confirmed-bg: rgba(16, 185, 129, 0.15);
+  --status-pending: #f59e0b;
+  --status-pending-bg: rgba(245, 158, 11, 0.15);
+  --status-denied: #ef4444;
+  --status-denied-bg: rgba(239, 68, 68, 0.15);
+  --status-absent: #94a3b8;
+  --status-absent-bg: rgba(148, 163, 184, 0.15);
+  --status-auto: #a855f7;
+  --status-auto-bg: rgba(168, 85, 247, 0.15);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .mitra-app {
+  background: radial-gradient(circle at 10% 20%, rgba(15, 23, 42, 0.9) 0%, rgba(11, 17, 32, 1) 90%);
+}
+
+[data-theme="dark"] .content-card,
+[data-theme="dark"] .quick-entry-card,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .modal-sheet,
+[data-theme="dark"] .quantity-card {
+  background: var(--bg-card);
+  border-color: rgba(51, 65, 85, 0.8);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-input,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .form-textarea,
+[data-theme="dark"] .stepper-input {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .form-input:focus,
+[data-theme="dark"] .form-select:focus,
+[data-theme="dark"] .form-textarea:focus {
+  border-color: var(--primary);
+  background: #1e293b;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="dark"] .form-label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .btn-secondary {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .mobile-bottom-nav {
+  background: rgba(19, 28, 46, 0.95);
+  border-top-color: rgba(51, 65, 85, 0.8);
+}
+
+[data-theme="dark"] .mobile-nav-item {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .mobile-nav-item.active {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .filter-pill-btn {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .filter-pill-btn.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+[data-theme="dark"] .figma-feature-header {
+  background: #131c2e;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .figma-feature-header:hover {
+  background: #1e293b;
+}
+
+[data-theme="dark"] .figma-feature-icon-circle {
+  background: #1e293b;
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .figma-feature-text h3 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .figma-feature-body {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .ledger-row-card {
+  background: #131c2e;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .ledger-row-card:hover {
+  background: #1e293b;
+  border-color: #3b82f6;
+}
+
+[data-theme="dark"] .stepper-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .stepper-btn:hover {
+  background: #334155;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
 }
 
-/* Point 41: Adjustable Font Size & Senior Accessibility */
+/* Point 41 & 64: Adjustable Font Size & Senior Accessibility */
 html {
   font-size: var(--app-font-scale, 16px);
 }
@@ -85,6 +242,9 @@ html[data-font-size="large"] {
 }
 html[data-font-size="xlarge"] {
   --app-font-scale: 20px;
+}
+html[data-font-size="ultra"] {
+  --app-font-scale: 22px;
 }
 
 html,

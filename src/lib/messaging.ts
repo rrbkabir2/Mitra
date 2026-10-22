@@ -38,7 +38,7 @@ const FAST2SMS_COST_PER_MSG = 0.25; // INR per message
 class MessagingService {
   private isClient = typeof window !== 'undefined';
   private logs: MessageLog[] = [];
-  private enabledChannels: MessagingChannel[] = ['whatsapp_cloud', 'personal_phone'];
+  private enabledChannels: MessagingChannel[] = ['personal_phone'];
 
   constructor() {
     this.loadState();
@@ -49,7 +49,19 @@ class MessagingService {
     try {
       const savedChannels = localStorage.getItem('mitra_enabled_channels');
       if (savedChannels) {
-        this.enabledChannels = JSON.parse(savedChannels);
+        try {
+          const parsed = JSON.parse(savedChannels);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.enabledChannels = parsed;
+          } else {
+            this.enabledChannels = ['personal_phone'];
+          }
+        } catch {
+          this.enabledChannels = ['personal_phone'];
+        }
+      } else {
+        this.enabledChannels = ['personal_phone'];
+        this.saveChannels();
       }
       const savedLogs = localStorage.getItem('mitra_messaging_logs');
       if (savedLogs) {
@@ -76,6 +88,20 @@ class MessagingService {
 
   public getEnabledChannels(): MessagingChannel[] {
     return [...this.enabledChannels];
+  }
+
+  /**
+   * Point 58: Returns channels that are BOTH user-enabled AND actually configured/connectable.
+   */
+  public getActiveChannels(): MessagingChannel[] {
+    const isWaConfigured = isWhatsAppLiveConfigured;
+    const isFast2SmsConfigured = Boolean(process.env.NEXT_PUBLIC_FAST2SMS_CONFIGURED || process.env.FAST2SMS_API_KEY);
+    return this.enabledChannels.filter((ch) => {
+      if (ch === 'whatsapp_cloud') return isWaConfigured;
+      if (ch === 'fast2sms') return isFast2SmsConfigured;
+      if (ch === 'personal_phone') return true;
+      return false;
+    });
   }
 
   public setChannelEnabled(channel: MessagingChannel, enabled: boolean) {
@@ -286,9 +312,11 @@ class MessagingService {
     };
 
     const cleanPhone = params.vendorPhone.replace(/[^0-9]/g, '');
+    const isWaConfigured = isWhatsAppLiveConfigured;
+    const isFast2SmsConfigured = Boolean(process.env.NEXT_PUBLIC_FAST2SMS_CONFIGURED || process.env.FAST2SMS_API_KEY);
 
-    // 1. Channel A: WhatsApp Cloud API
-    if (this.enabledChannels.includes('whatsapp_cloud')) {
+    // 1. Channel A: WhatsApp Cloud API - strictly only if BOTH enabled AND configured
+    if (this.enabledChannels.includes('whatsapp_cloud') && isWaConfigured) {
       results.whatsapp_cloud.attempted = true;
       try {
         const res = await sendWhatsAppDeliveryMessage({
@@ -307,8 +335,8 @@ class MessagingService {
       }
     }
 
-    // 2. Channel B: Fast2SMS / Third-Party SMS Gateway
-    if (this.enabledChannels.includes('fast2sms')) {
+    // 2. Channel B: Fast2SMS / Third-Party SMS Gateway - strictly only if BOTH enabled AND configured
+    if (this.enabledChannels.includes('fast2sms') && isFast2SmsConfigured) {
       results.fast2sms.attempted = true;
       try {
         // Execute server-side or simulated Fast2SMS dispatch
@@ -355,8 +383,8 @@ class MessagingService {
   }
 
   /**
-   * Requirement 28: Dispatches one-time purchase notifications through ALL enabled channels
-   * (WhatsApp Cloud API, Fast2SMS, Personal Phone 1-tap)
+   * Requirement 28 & Point 58: Dispatches one-time purchase notifications through ALL enabled channels
+   * (strictly verifies channel enablement and configuration)
    */
   public async dispatchPurchase(params: {
     vendorPhone: string;
@@ -397,9 +425,11 @@ class MessagingService {
 
     const cleanPhone = params.vendorPhone.replace(/[^0-9]/g, '');
     const dispatchedChannels: string[] = [];
+    const isWaConfigured = isWhatsAppLiveConfigured;
+    const isFast2SmsConfigured = Boolean(process.env.NEXT_PUBLIC_FAST2SMS_CONFIGURED || process.env.FAST2SMS_API_KEY);
 
-    // 1. Channel A: WhatsApp Cloud API
-    if (this.enabledChannels.includes('whatsapp_cloud')) {
+    // 1. Channel A: WhatsApp Cloud API - strictly only if BOTH enabled AND configured
+    if (this.enabledChannels.includes('whatsapp_cloud') && isWaConfigured) {
       results.whatsapp_cloud.attempted = true;
       try {
         const res = await sendWhatsAppDeliveryMessage({
@@ -426,8 +456,8 @@ class MessagingService {
       }
     }
 
-    // 2. Channel B: Fast2SMS / Transactional SMS
-    if (this.enabledChannels.includes('fast2sms')) {
+    // 2. Channel B: Fast2SMS / Transactional SMS - strictly only if BOTH enabled AND configured
+    if (this.enabledChannels.includes('fast2sms') && isFast2SmsConfigured) {
       results.fast2sms.attempted = true;
       try {
         const smsRes = await fetch('/api/messaging/fast2sms', {
@@ -471,8 +501,8 @@ class MessagingService {
 
     const summaryText =
       dispatchedChannels.length > 0
-        ? `Dispatched across: ${dispatchedChannels.join(', ')}`
-        : 'Logged to household ledger';
+        ? `Dispatched via: ${dispatchedChannels.join(', ')}`
+        : 'Logged to household ledger (No active external messaging channels configured)';
 
     return { channelResults: results, summaryText };
   }

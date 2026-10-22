@@ -42,6 +42,23 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="manifest" href="/manifest.json" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var theme = localStorage.getItem('mitra_theme');
+                if (!theme) {
+                  theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.setAttribute('data-theme', theme);
+                var fontSize = localStorage.getItem('mitra_font_size');
+                if (fontSize) {
+                  document.documentElement.setAttribute('data-font-size', fontSize);
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
       </head>
       <body suppressHydrationWarning>
         <MitraProvider>

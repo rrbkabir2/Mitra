@@ -26,6 +26,13 @@ import {
   UserPlus,
   Type,
   AlertTriangle,
+  Sun,
+  Moon,
+  Minus,
+  Plus,
+  Linkedin,
+  Github,
+  Mail,
 } from 'lucide-react';
 
 import { messagingService, MessagingChannel, ChannelConfig } from '@/lib/messaging';
@@ -52,14 +59,16 @@ export default function SettingsPage() {
     toggleAdvancedMode,
     pruneSettledPhotos,
     clearOperationalData,
+    theme,
+    setTheme,
   } = useMitra();
 
   // Point 12: Messaging Channels State
   const [enabledChannels, setEnabledChannels] = useState<MessagingChannel[]>([]);
   const [channelConfigs, setChannelConfigs] = useState<ChannelConfig[]>([]);
 
-  // Point 41: Adjustable Font Size & Senior Accessibility
-  const [fontSize, setFontSizeState] = useState<'small' | 'default' | 'large' | 'xlarge'>('default');
+  // Point 41 & 64: Adjustable Font Size & Senior Accessibility (includes 'ultra')
+  const [fontSize, setFontSizeState] = useState<'small' | 'default' | 'large' | 'xlarge' | 'ultra'>('default');
 
   // Point 55: Delete All Data State & Confirmation Modal
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
@@ -86,17 +95,40 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = (localStorage.getItem('mitra_font_size') as 'small' | 'default' | 'large' | 'xlarge') || 'default';
+      const saved = (localStorage.getItem('mitra_font_size') as 'small' | 'default' | 'large' | 'xlarge' | 'ultra') || 'default';
       setFontSizeState(saved);
       document.documentElement.setAttribute('data-font-size', saved);
     }
   }, []);
 
-  const handleFontSizeChange = (size: 'small' | 'default' | 'large' | 'xlarge') => {
+  const handleFontSizeChange = (size: 'small' | 'default' | 'large' | 'xlarge' | 'ultra') => {
     setFontSizeState(size);
     if (typeof window !== 'undefined') {
       localStorage.setItem('mitra_font_size', size);
       document.documentElement.setAttribute('data-font-size', size);
+    }
+  };
+
+  const FONT_TIERS: Array<{ id: 'small' | 'default' | 'large' | 'xlarge' | 'ultra'; label: string; sample: string; sub: string }> = [
+    { id: 'small', label: 'Small', sample: '14px', sub: 'Compact view' },
+    { id: 'default', label: 'Default', sample: '16px', sub: 'Standard readability' },
+    { id: 'large', label: 'Large', sample: '18px', sub: 'Senior friendly' },
+    { id: 'xlarge', label: 'Extra Large', sample: '20px', sub: 'High legibility' },
+    { id: 'ultra', label: 'Ultra Extra Large', sample: '22px', sub: 'Maximum senior clarity' },
+  ];
+
+  const currentFontIndex = FONT_TIERS.findIndex((t) => t.id === fontSize);
+  const safeFontIndex = currentFontIndex >= 0 ? currentFontIndex : 1;
+
+  const handleDecreaseFont = () => {
+    if (safeFontIndex > 0) {
+      handleFontSizeChange(FONT_TIERS[safeFontIndex - 1].id);
+    }
+  };
+
+  const handleIncreaseFont = () => {
+    if (safeFontIndex < FONT_TIERS.length - 1) {
+      handleFontSizeChange(FONT_TIERS[safeFontIndex + 1].id);
     }
   };
 
@@ -114,31 +146,6 @@ export default function SettingsPage() {
   const [reminderTime, setReminderTime] = useState<string>(household.daily_reminder_time || '09:00');
   const [autoConfirmHours, setAutoConfirmHours] = useState<number>(household.auto_confirm_hours || 24);
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
-
-  // Requirement 22: Sample Data Seeding State
-  const [isSeedingData, setIsSeedingData] = useState<boolean>(false);
-  const [seedStatusMsg, setSeedStatusMsg] = useState<string | null>(null);
-
-  const handleSeedSampleData = async () => {
-    setIsSeedingData(true);
-    setSeedStatusMsg(null);
-    try {
-      const res = await fetch('/api/admin/seed', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        setSeedStatusMsg('Successfully populated Supabase database with 5 months of realistic history (126 entries across 3 vendors)!');
-        setTimeout(() => {
-          if (typeof window !== 'undefined') window.location.reload();
-        }, 1200);
-      } else {
-        setSeedStatusMsg(`Seeding error: ${data.details || data.error || 'Failed to seed'}`);
-      }
-    } catch (err: any) {
-      setSeedStatusMsg(`Seeding request failed: ${err?.message}`);
-    } finally {
-      setIsSeedingData(false);
-    }
-  };
 
   // Admin Management State
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
@@ -625,7 +632,74 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* POINT 41: ADJUSTABLE FONT SIZE FOR SENIOR ACCESSIBILITY */}
+        {/* POINT 56: THEME & VISUAL APPEARANCE (SWITCHABLE THEME) */}
+        <section className="content-card" id="section-theme-appearance">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+            <Sun size={20} color="var(--primary)" />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Theme & Visual Appearance</h3>
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+            Choose your preferred interface theme. Persisted across your sessions and devices.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem' }}>
+            <button
+              type="button"
+              onClick={() => setTheme('light')}
+              className={`quantity-card ${theme === 'light' ? 'active' : ''}`}
+              style={{
+                padding: '1rem',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                borderColor: theme === 'light' ? 'var(--primary)' : 'var(--border-glass)',
+                background: theme === 'light' ? 'var(--primary-light)' : 'var(--bg-card)',
+              }}
+              id="btn-theme-light"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Sun size={22} color="#f59e0b" />
+                {theme === 'light' && <Check size={16} color="var(--primary)" />}
+              </div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                Light Mode
+              </div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                Crisp high-contrast day theme
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTheme('dark')}
+              className={`quantity-card ${theme === 'dark' ? 'active' : ''}`}
+              style={{
+                padding: '1rem',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem',
+                borderColor: theme === 'dark' ? 'var(--primary)' : 'var(--border-glass)',
+                background: theme === 'dark' ? 'var(--primary-light)' : 'var(--bg-card)',
+              }}
+              id="btn-theme-dark"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Moon size={22} color="#3b82f6" />
+                {theme === 'dark' && <Check size={16} color="var(--primary)" />}
+              </div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                Dark Mode
+              </div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                Deep OLED slate night theme
+              </div>
+            </button>
+          </div>
+        </section>
+
+        {/* POINT 41 & POINT 64: COMPACT STEPPER FONT SIZE CONTROLLER */}
         <section className="content-card" id="section-font-size-accessibility">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
             <Type size={20} color="var(--primary)" />
@@ -635,37 +709,101 @@ export default function SettingsPage() {
             Adjust the display text size across the entire Mitra application for comfortable reading and senior accessibility.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-            {[
-              { id: 'small', label: 'Small', sample: '14px', sub: 'Compact' },
-              { id: 'default', label: 'Default', sample: '16px', sub: 'Standard' },
-              { id: 'large', label: 'Large', sample: '18px', sub: 'Senior Friendly' },
-              { id: 'xlarge', label: 'Extra Large', sample: '20px', sub: 'Max Legibility' },
-            ].map((fItem) => (
+          {/* Point 64: Space-efficient single compact stepper box */}
+          <div
+            style={{
+              background: 'var(--bg-card-subtle, #f8fafc)',
+              border: '1.5px solid var(--border-glass, #e2e8f0)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '1rem 1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+              maxWidth: '480px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
               <button
-                key={fItem.id}
                 type="button"
-                onClick={() => handleFontSizeChange(fItem.id as 'small' | 'default' | 'large' | 'xlarge')}
-                className={`quantity-card ${fontSize === fItem.id ? 'active' : ''}`}
+                onClick={handleDecreaseFont}
+                disabled={safeFontIndex === 0}
+                className="btn-secondary"
                 style={{
-                  padding: '0.85rem 0.65rem',
-                  textAlign: 'center',
-                  borderColor: fontSize === fItem.id ? 'var(--primary)' : 'var(--border-glass)',
-                  background: fontSize === fItem.id ? 'var(--primary-light)' : 'var(--bg-card)',
+                  width: '46px',
+                  height: '46px',
+                  padding: 0,
+                  borderRadius: '12px',
+                  fontSize: '1.25rem',
+                  fontWeight: 800,
+                  opacity: safeFontIndex === 0 ? 0.35 : 1,
+                  cursor: safeFontIndex === 0 ? 'not-allowed' : 'pointer',
+                  flexShrink: 0,
                 }}
-                id={`btn-font-size-${fItem.id}`}
+                id="btn-font-decrease"
+                title="Decrease font size"
+                aria-label="Decrease font size"
               >
-                <div style={{ fontSize: fItem.sample, fontWeight: 800, color: fontSize === fItem.id ? 'var(--primary)' : 'var(--text-primary)', marginBottom: '0.2rem' }}>
-                  Aa
-                </div>
-                <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>
-                  {fItem.label}
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  {fItem.sub}
-                </div>
+                <Minus size={20} />
               </button>
-            ))}
+
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div
+                  style={{
+                    fontSize: FONT_TIERS[safeFontIndex].sample,
+                    fontWeight: 800,
+                    color: 'var(--text-primary)',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {FONT_TIERS[safeFontIndex].label} ({FONT_TIERS[safeFontIndex].sample})
+                </div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  {FONT_TIERS[safeFontIndex].sub}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleIncreaseFont}
+                disabled={safeFontIndex === FONT_TIERS.length - 1}
+                className="btn-secondary"
+                style={{
+                  width: '46px',
+                  height: '46px',
+                  padding: 0,
+                  borderRadius: '12px',
+                  fontSize: '1.25rem',
+                  fontWeight: 800,
+                  opacity: safeFontIndex === FONT_TIERS.length - 1 ? 0.35 : 1,
+                  cursor: safeFontIndex === FONT_TIERS.length - 1 ? 'not-allowed' : 'pointer',
+                  flexShrink: 0,
+                }}
+                id="btn-font-increase"
+                title="Increase font size"
+                aria-label="Increase font size"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+
+            {/* Stepper Level Indicators */}
+            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '0.25rem' }}>
+              {FONT_TIERS.map((tier, idx) => (
+                <div
+                  key={tier.id}
+                  onClick={() => handleFontSizeChange(tier.id)}
+                  style={{
+                    height: '6px',
+                    width: idx === safeFontIndex ? '28px' : '14px',
+                    borderRadius: '999px',
+                    background: idx === safeFontIndex ? 'var(--primary)' : '#cbd5e1',
+                    cursor: 'pointer',
+                    transition: 'all 0.25s ease',
+                  }}
+                  title={tier.label}
+                />
+              ))}
+            </div>
           </div>
         </section>
 
@@ -956,69 +1094,6 @@ export default function SettingsPage() {
         </section>
 
         {/* =========================================================================
-            POINT 22 & POINT 54: VERIFICATION TESTING & 5-MONTH SAMPLE DATA SEEDING
-            ========================================================================= */}
-        <section className="content-card" id="section-sample-data">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
-            <div style={{ background: '#183d2d', color: '#ffffff', padding: '0.45rem', borderRadius: '10px', display: 'flex' }}>
-              <Layers size={20} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '1.12rem', fontWeight: 800 }}>Sample Delivery History & Standalone SQL Export</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Live database is clean. Reload 5 months of test data on demand or use the exported SQL script.
-              </p>
-            </div>
-          </div>
-
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '0.85rem' }}>
-            Enables full testing of History page filters (Status: Pending, Confirmed, Auto-Confirmed, Denied, Absent; Vendors: Ramesh Patil Dairy, Kisan Fresh Groceries, Amul Country Fresh; Multi-Month Date Range picker).
-          </p>
-
-          <div
-            style={{
-              padding: '0.75rem',
-              borderRadius: 'var(--radius-md)',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              fontSize: '0.78rem',
-              color: '#334155',
-              lineHeight: 1.45,
-              marginBottom: '1rem',
-            }}
-          >
-            📄 <strong>Standalone SQL File Available:</strong> The complete 5-month realistic dataset is preserved in <code style={{ background: '#e2e8f0', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>supabase/sample_delivery_seed.sql</code>. You can copy and execute it directly in the Supabase SQL Editor anytime to reload the sample dataset.
-          </div>
-
-          {seedStatusMsg && (
-            <div
-              style={{
-                padding: '0.75rem',
-                borderRadius: 'var(--radius-md)',
-                background: seedStatusMsg.includes('error') || seedStatusMsg.includes('failed') ? '#fef2f2' : '#f0fdf4',
-                color: seedStatusMsg.includes('error') || seedStatusMsg.includes('failed') ? '#b91c1c' : '#15803d',
-                fontSize: '0.82rem',
-                marginBottom: '1rem',
-                fontWeight: 600,
-              }}
-            >
-              {seedStatusMsg}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={handleSeedSampleData}
-            disabled={isSeedingData}
-            className="btn-primary"
-            id="btn-seed-sample-data"
-            style={{ fontSize: '0.86rem', padding: '0.65rem 1.25rem' }}
-          >
-            {isSeedingData ? 'Populating Database (5 Months)...' : 'Seed 5 Months of Sample History'}
-          </button>
-        </section>
-
-        {/* =========================================================================
             POINT 55: DELETE ALL DATA (WIPES ONLY OPERATIONAL / TRANSACTIONAL DATA)
             ========================================================================= */}
         <section className="content-card" id="section-delete-all-data" style={{ border: '1.5px solid #fecaca' }}>
@@ -1086,6 +1161,130 @@ export default function SettingsPage() {
             <Trash2 size={16} />
             <span>Delete All Operational Data</span>
           </button>
+        </section>
+
+        {/* POINT 68: ABOUT ME / CREATOR INTRODUCTION SECTION (VERY BOTTOM OF SETTINGS) */}
+        <section
+          className="content-card"
+          id="section-about-me"
+          style={{
+            border: '1.5px solid var(--border-glass, #e2e8f0)',
+            background: 'var(--bg-card, #ffffff)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '1.5rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.15rem', flexWrap: 'wrap' }}>
+            {/* Creator's GitHub Profile Photo (Always live via GitHub avatar URL) */}
+            <img
+              src="https://github.com/rrbkabir2.png"
+              alt="Kabir Bundele"
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                objectFit: 'cover',
+                border: '2.5px solid #183d2d',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
+                flexShrink: 0,
+              }}
+            />
+
+            <div style={{ flex: 1, minWidth: '220px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Kabir Bundele
+                </h3>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    background: '#ecfdf5',
+                    color: '#065f46',
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '999px',
+                    fontWeight: 700,
+                    border: '1px solid #a7f3d0',
+                  }}
+                >
+                  Creator & Platform Architect
+                </span>
+              </div>
+
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: 1.45 }}>
+                Designed and built Mitra as a permanent, tamper-proof delivery confirmation trust layer between households and local daily suppliers.
+              </p>
+
+              {/* Creator Circular Contact Icons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '0.85rem' }}>
+                <a
+                  href="https://www.linkedin.com/in/kabir-bundele-a2ba81295/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: '#0a66c2',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(10, 102, 194, 0.3)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                  title="Connect on LinkedIn"
+                  aria-label="LinkedIn"
+                  id="link-creator-linkedin"
+                >
+                  <Linkedin size={18} />
+                </a>
+
+                <a
+                  href="https://github.com/rrbkabir2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: '#24292e',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                  title="View GitHub Profile"
+                  aria-label="GitHub"
+                  id="link-creator-github"
+                >
+                  <Github size={18} />
+                </a>
+
+                <a
+                  href="mailto:rrbkabir2@gmail.com"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: '#ea4335',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(234, 67, 53, 0.3)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                  title="Send Direct Email"
+                  aria-label="Email"
+                  id="link-creator-email"
+                >
+                  <Mail size={18} />
+                </a>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* POINT 55: DESTRUCTIVE ACTION CONFIRMATION MODAL */}

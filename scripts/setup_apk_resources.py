@@ -130,9 +130,23 @@ def setup_resources():
             ["host", "endsWith", "google.co.in"],
             ["host", "endsWith", "googleapis.com"],
             ["host", "endsWith", "googleusercontent.com"],
-            ["host", "gstatic.com"]
+            ["host", "endsWith", "gstatic.com"],
+            ["host", "equals", "wa.me"],
+            ["host", "endsWith", "whatsapp.com"],
+            ["host", "endsWith", "linkedin.com"],
+            ["host", "endsWith", "github.com"],
+            ["scheme", "equals", "whatsapp"],
+            ["scheme", "equals", "mailto"],
+            ["scheme", "equals", "tel"]
         ],
         "skip": [
+            ["host", "equals", "wa.me"],
+            ["host", "endsWith", "whatsapp.com"],
+            ["host", "endsWith", "linkedin.com"],
+            ["host", "endsWith", "github.com"],
+            ["scheme", "equals", "whatsapp"],
+            ["scheme", "equals", "mailto"],
+            ["scheme", "equals", "tel"],
             ["path", "endsWith", ".apk"],
             ["path", "endsWith", ".pdf"],
             ["path", "endsWith", ".txt"],
@@ -143,20 +157,22 @@ def setup_resources():
             ["path", "endsWith", ".epub"],
             ["query", "contains", "type=epub"]
         ],
-        "remote_debug": False,
-        "console_log": False,
+        "remote_debug": True,
+        "console_log": True,
         "js_interface": True,
         "context_menu": False,
-        "not_matching": False,
+        "not_matching": True,
         "local_sites": False,
         "update_zip": "",
         "web_settings": {
             "JavaScriptEnabled": True,
             "DomStorageEnabled": True,
-            "DatabaseEnabled": True
+            "DatabaseEnabled": True,
+            "AllowFileAccess": True,
+            "AllowContentAccess": True
         },
         "source": "assets",
-        "timestamp": "2026-10-17T12:00:00Z"
+        "timestamp": "2026-10-22T10:00:00Z"
     }
     with open(os.path.join(assets_dir, 'settings.json'), 'w', encoding='utf-8') as f:
         json.dump(settings_data, f, indent=2)
@@ -261,6 +277,39 @@ def setup_resources():
             f.write(splash_html)
 
     print('Assets configured with Mitra splash and redirection.')
+
+    # 7. Patch AndroidManifest.xml (Camera permissions, features, queries)
+    manifest_path = os.path.join(src_dir, 'AndroidManifest.xml')
+    if os.path.exists(manifest_path):
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            man_content = f.read()
+        if 'android.permission.CAMERA' not in man_content:
+            man_content = man_content.replace(
+                '<uses-permission android:name="android.permission.INTERNET"/>',
+                '<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:maxSdkVersion="29" android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>\n    <uses-feature android:name="android.hardware.camera" android:required="false"/>\n    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>'
+            )
+        if 'android.media.action.IMAGE_CAPTURE' not in man_content:
+            man_content = man_content.replace(
+                '<queries>',
+                '<queries>\n        <intent>\n            <action android:name="android.media.action.IMAGE_CAPTURE"/>\n        </intent>\n        <intent>\n            <action android:name="android.intent.action.VIEW"/>\n            <data android:scheme="whatsapp"/>\n        </intent>\n        <intent>\n            <action android:name="android.intent.action.VIEW"/>\n            <data android:scheme="mailto"/>\n        </intent>\n        <intent>\n            <action android:name="android.intent.action.VIEW"/>\n            <data android:scheme="tel"/>\n        </intent>'
+            )
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            f.write(man_content)
+        print('Verified AndroidManifest.xml Camera, Queries, and Storage Permissions.')
+
+    # 8. Patch filepaths.xml
+    fp_path = os.path.join(src_dir, 'res', 'xml', 'filepaths.xml')
+    if os.path.exists(fp_path):
+        with open(fp_path, 'r', encoding='utf-8') as f:
+            fp_content = f.read()
+        if '<cache-path' not in fp_content:
+            fp_content = fp_content.replace(
+                '<paths\n  xmlns:android="http://schemas.android.com/apk/res/android">',
+                '<paths\n  xmlns:android="http://schemas.android.com/apk/res/android">\n    <cache-path name="cache" path="." />\n    <files-path name="internal" path="." />\n    <external-cache-path name="ext_cache" path="." />'
+            )
+            with open(fp_path, 'w', encoding='utf-8') as f:
+                f.write(fp_content)
+        print('Verified filepaths.xml cache and internal paths.')
 
 if __name__ == '__main__':
     setup_resources()

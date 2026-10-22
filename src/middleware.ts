@@ -21,6 +21,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/auth/callback') ||
     pathname.startsWith('/v/') ||
+    pathname.startsWith('/api/auth/forgot-password') ||
     pathname.startsWith('/api/whatsapp/webhook') ||
     pathname.startsWith('/api/reminders/check') ||
     pathname.startsWith('/api/keep-alive') ||

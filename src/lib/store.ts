@@ -106,28 +106,6 @@ const DEFAULT_PRODUCTS: Product[] = [
     is_milk_type: false,
     created_at: '2026-01-01T00:00:00.000Z',
   },
-  {
-    id: 'prod-05',
-    household_id: 'hh-01',
-    vendor_id: 'v-02',
-    name: 'Organic Farm Cow Milk',
-    unit_type: 'litre',
-    default_price: 68,
-    is_milk_type: true,
-    milk_subtype: 'cow',
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'prod-06',
-    household_id: 'hh-01',
-    vendor_id: 'v-03',
-    name: 'Taaza Buffalo Milk',
-    unit_type: 'litre',
-    default_price: 72,
-    is_milk_type: true,
-    milk_subtype: 'buffalo',
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
 ];
 
 // Requirement 22: Generate rich, realistic 5-month sample delivery history
@@ -161,12 +139,12 @@ function generateDefaultEntries(): Entry[] {
 
       if (day % 7 === 0) {
         vendorId = 'v-02';
-        productId = 'prod-05';
-        unitPrice = 68;
+        productId = 'prod-01';
+        unitPrice = 60;
       } else if (day % 11 === 0) {
         vendorId = 'v-03';
-        productId = 'prod-06';
-        unitPrice = 72;
+        productId = 'prod-02';
+        unitPrice = 75;
       } else if (day % 5 === 0) {
         productId = 'prod-02';
         unitPrice = 75;
@@ -322,11 +300,31 @@ class MitraStore {
 
       const p = localStorage.getItem('mitra_products');
       if (p) {
-        this.products = JSON.parse(p);
-        if (this.products.length < 6) {
+        try {
+          const parsed = JSON.parse(p) as Product[];
+          // Point 57: Simplify milk types down to ONLY two entries: Cow Milk and Buffalo Milk
+          // Remove any extra branded milk variants (Organic Farm Cow Milk, Taaza Buffalo Milk, etc.)
+          const cleaned = parsed.filter(
+            (prod) =>
+              !prod.is_milk_type ||
+              prod.name.trim().toLowerCase() === 'cow milk' ||
+              prod.name.trim().toLowerCase() === 'buffalo milk'
+          );
+          const hasCow = cleaned.some((x) => x.is_milk_type && x.milk_subtype === 'cow');
+          const hasBuffalo = cleaned.some((x) => x.is_milk_type && x.milk_subtype === 'buffalo');
+          if (!hasCow || !hasBuffalo || cleaned.length < 2) {
+            this.products = DEFAULT_PRODUCTS;
+          } else {
+            this.products = cleaned;
+          }
+          this.saveToStorage();
+        } catch {
           this.products = DEFAULT_PRODUCTS;
           this.saveToStorage();
         }
+      } else {
+        this.products = DEFAULT_PRODUCTS;
+        this.saveToStorage();
       }
 
       // Point 54: Strictly load user-recorded entries or empty array (no forced sample data injection)
@@ -341,10 +339,21 @@ class MitraStore {
         this.entries = [];
       }
 
+      // Point 57: Price change audit trail remains fully intact and untouched
       const pr = localStorage.getItem('mitra_price_requests');
       if (pr) {
         try {
-          this.priceRequests = JSON.parse(pr);
+          const loadedRequests = JSON.parse(pr) as PriceChangeRequest[];
+          // Remap legacy extra product IDs to canonical cow/buffalo so history stays valid
+          this.priceRequests = loadedRequests.map((req) => {
+            if (req.product_id === 'prod-05' || req.product_id === '00000000-0000-0000-0000-000000000105') {
+              return { ...req, product_id: 'prod-01' };
+            }
+            if (req.product_id === 'prod-06' || req.product_id === '00000000-0000-0000-0000-000000000106') {
+              return { ...req, product_id: 'prod-02' };
+            }
+            return req;
+          });
         } catch {
           this.priceRequests = [];
         }

@@ -27,8 +27,24 @@ export default function PricingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Filter only milk products
-  const milkProducts = products.filter((p) => p.is_milk_type);
+  // Point 57: Strictly simplify the milk type list down to only two canonical entries: Cow Milk and Buffalo Milk
+  const milkProducts = React.useMemo(() => {
+    const list: Product[] = [];
+    const cow = products.find(
+      (p) => p.is_milk_type && (p.milk_subtype === 'cow' || p.name.toLowerCase().includes('cow'))
+    );
+    const buffalo = products.find(
+      (p) => p.is_milk_type && (p.milk_subtype === 'buffalo' || p.name.toLowerCase().includes('buffalo'))
+    );
+
+    if (cow) {
+      list.push({ ...cow, name: 'Cow Milk', milk_subtype: 'cow' });
+    }
+    if (buffalo) {
+      list.push({ ...buffalo, name: 'Buffalo Milk', milk_subtype: 'buffalo' });
+    }
+    return list;
+  }, [products]);
 
   const handleOpenRequest = (prod: Product) => {
     setSelectedProduct(prod);

@@ -20,6 +20,22 @@ export default function AuthCallbackPage() {
       }
 
       try {
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const code = urlParams.get('code');
+          if (code) {
+            try {
+              const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+              if (!error && data?.session?.user?.email) {
+                await verifyAndRedirect(data.session.user.email);
+                return;
+              }
+            } catch (e) {
+              console.error('exchangeCodeForSession error:', e);
+            }
+          }
+        }
+
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error || !session) {

@@ -167,14 +167,12 @@ export async function sendWhatsAppDeliveryMessage(params: {
     }
   }
 
-  // Development / Demo Simulation Mode
-  const simulatedMessageId = `sim_wamid_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  console.log(`[WhatsApp Simulator] Dispatched to ${vendorPhone}:`, bodyText);
-
+  // When live WhatsApp credentials are not configured, report it as not configured
   return {
-    success: true,
-    messageId: simulatedMessageId,
-    deliveredTimestamp: new Date().toISOString(),
+    success: false,
+    messageId: '',
+    deliveredTimestamp: '',
+    error: 'WhatsApp Business Cloud API is not configured. Use the Personal Phone 1-Tap channel to dispatch directly.',
     isSimulated: true,
   };
 }
@@ -232,9 +230,10 @@ export async function sendWhatsAppAbsentAlert(params: {
   }
 
   return {
-    success: true,
-    messageId: `sim_absent_${Date.now()}`,
-    deliveredTimestamp: new Date().toISOString(),
+    success: false,
+    messageId: '',
+    deliveredTimestamp: '',
+    error: 'WhatsApp Business Cloud API is not configured. Use the Personal Phone 1-Tap channel to notify the vendor.',
     isSimulated: true,
   };
 }
@@ -295,9 +294,10 @@ export async function sendWhatsAppPriceRequest(params: {
   }
 
   return {
-    success: true,
-    messageId: `sim_price_${Date.now()}`,
-    deliveredTimestamp: new Date().toISOString(),
+    success: false,
+    messageId: '',
+    deliveredTimestamp: '',
+    error: 'WhatsApp Business Cloud API is not configured. Price request recorded in portal.',
     isSimulated: true,
   };
 }

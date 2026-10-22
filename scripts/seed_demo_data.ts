@@ -152,26 +152,6 @@ export async function runDemoSeed({ cleanFirst = false }: SeedOptions = {}) {
       default_price: 40,
       is_milk_type: false,
     },
-    {
-      id: '00000000-0000-0000-0000-000000000105',
-      household_id: householdId,
-      vendor_id: v2,
-      name: 'Organic Farm Cow Milk',
-      unit_type: 'litre',
-      default_price: 68,
-      is_milk_type: true,
-      milk_subtype: 'cow',
-    },
-    {
-      id: '00000000-0000-0000-0000-000000000106',
-      household_id: householdId,
-      vendor_id: v3,
-      name: 'Taaza Buffalo Milk',
-      unit_type: 'litre',
-      default_price: 72,
-      is_milk_type: true,
-      milk_subtype: 'buffalo',
-    },
   ];
 
   const { error: pErr } = await supabase
@@ -220,12 +200,12 @@ export async function runDemoSeed({ cleanFirst = false }: SeedOptions = {}) {
 
       if (day % 7 === 0) {
         vendorId = v2;
-        productId = '00000000-0000-0000-0000-000000000105'; // Organic Milk ₹68
-        unitPrice = 68;
+        productId = '00000000-0000-0000-0000-000000000101'; // Cow Milk ₹60
+        unitPrice = 60;
       } else if (day % 11 === 0) {
         vendorId = v3;
-        productId = '00000000-0000-0000-0000-000000000106'; // Taaza Buffalo ₹72
-        unitPrice = 72;
+        productId = '00000000-0000-0000-0000-000000000102'; // Buffalo Milk ₹75
+        unitPrice = 75;
       } else if (day % 5 === 0) {
         productId = '00000000-0000-0000-0000-000000000102'; // Buffalo Milk ₹75
         unitPrice = 75;

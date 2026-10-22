@@ -31,10 +31,32 @@ import {
   Printer,
   Users,
   FileText,
+  RotateCw,
 } from 'lucide-react';
 
 export default function HistoryPage() {
-  const { t, entries, vendors, products, household, editDeliveryEntry, deleteDeliveryEntry } = useMitra();
+  const { t, entries, vendors, products, household, editDeliveryEntry, deleteDeliveryEntry, refreshData } = useMitra();
+
+  // Point 60: Instant live database sync on History mount
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  React.useEffect(() => {
+    refreshData().catch(() => {});
+  }, [refreshData]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+      setActionToast('Live records synchronized from Supabase database!');
+      setTimeout(() => setActionToast(null), 3500);
+    } catch {
+      setActionToast('Sync completed.');
+      setTimeout(() => setActionToast(null), 3500);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Point 6 & 20: Delivery History Filter Pattern with Custom Date Range & Vendor Filter
   const now = new Date();
@@ -326,13 +348,28 @@ export default function HistoryPage() {
       <TrustSafeguardBanner />
 
       {/* Header */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-          {t.history.title}
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '0.2rem' }}>
-          {t.history.subtitle}
-        </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            {t.history.title}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '0.2rem' }}>
+            {t.history.subtitle}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleManualRefresh}
+          disabled={isRefreshing}
+          className="btn-secondary"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', padding: '0.45rem 0.9rem', borderRadius: '10px' }}
+          id="btn-sync-history-db"
+          title="Sync live records from Supabase database"
+        >
+          <RotateCw size={15} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+          <span>{isRefreshing ? 'Syncing...' : 'Sync Live DB'}</span>
+        </button>
       </div>
 
       {/* =========================================================================
@@ -676,7 +713,18 @@ export default function HistoryPage() {
       {filteredEntries.length === 0 ? (
         <div className="content-card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
           <Clock size={36} color="#94a3b8" style={{ margin: '0 auto 0.75rem auto' }} />
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{t.history.empty}</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.75rem' }}>{t.history.empty}</p>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', padding: '0.45rem 1rem', borderRadius: '8px' }}
+            id="btn-empty-state-refresh"
+          >
+            <RotateCw size={14} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+            <span>{isRefreshing ? 'Checking Supabase...' : 'Refresh from Live Database'}</span>
+          </button>
         </div>
       ) : (
         <div className="ledger-list" role="feed" aria-label="Delivery History Ledger">

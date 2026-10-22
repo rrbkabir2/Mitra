@@ -65,6 +65,10 @@ interface MitraContextType {
   setAllVendorsAutoMonthlyReport: (enabled: boolean) => Promise<void>;
   autoConfirmOverdueDeliveries: (hours?: number) => Promise<number>;
   clearOperationalData: () => Promise<boolean>;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
+  toggleTheme: () => void;
+  refreshData: () => Promise<void>;
 }
 
 const MitraContext = createContext<MitraContextType | null>(null);
@@ -81,6 +85,36 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(mitraStore.getPurchases());
   const [whatsappUsageCount, setWhatsappUsageCount] = useState<number>(mitraStore.getWhatsAppUsageCount());
   
+  // Point 56: Switchable Theme State (Light / Dark), persisted in localStorage
+  const [theme, setThemeState] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('mitra_theme') as 'light' | 'dark' | null;
+      if (savedTheme === 'dark' || savedTheme === 'light') {
+        setThemeState(savedTheme);
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } else {
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const initial = prefersDark ? 'dark' : 'light';
+        setThemeState(initial);
+        document.documentElement.setAttribute('data-theme', initial);
+      }
+    }
+  }, []);
+
+  const setTheme = (newTheme: 'light' | 'dark') => {
+    setThemeState(newTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mitra_theme', newTheme);
+      document.documentElement.setAttribute('data-theme', newTheme);
+    }
+  };
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
   // Point 2: Authentication gating - initial state is unauthenticated until session is verified
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
@@ -106,8 +140,34 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // Fetch real data from Supabase if configured
+  // Point 60: Fetch real data from canonical /api/sync endpoint (bypasses RLS issues for both Web and APK)
   const fetchSupabaseData = useCallback(async () => {
+    try {
+      // 1. Primary path: Server-side canonical sync route (guarantees identical data between Web & Android app)
+      const res = await fetch(`/api/sync?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          if (data.household) mitraStore.updateHousehold(data.household);
+          if (data.vendors && data.vendors.length > 0) mitraStore.setVendors(data.vendors);
+          if (data.products && data.products.length > 0) mitraStore.setProducts(data.products);
+          if (data.entries) mitraStore.setEntries(data.entries);
+          if (data.priceRequests) mitraStore.setPriceRequests(data.priceRequests);
+          if (data.purchases) mitraStore.setPurchases(data.purchases);
+          if (typeof data.whatsappUsageCount === 'number') mitraStore.setWhatsAppUsageCount(data.whatsappUsageCount);
+          setIsDbConnected(true);
+          return;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Sync API] Server route unavailable, trying direct Supabase client fallback:', apiErr);
+    }
+
+    // Direct Supabase client fallback
     if (!isSupabaseConfigured || !supabase) return;
 
     try {
@@ -168,7 +228,11 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Requirement 21: Verify Authentication on Mount with Web Browser Session Checking
+  const refreshData = useCallback(async () => {
+    await fetchSupabaseData();
+  }, [fetchSupabaseData]);
+
+  // Requirement 21 & Point 60: Verify Authentication on Mount with Web Browser Session Checking
   useEffect(() => {
     let isMounted = true;
     async function checkAuth() {
@@ -195,6 +259,8 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
         if (existingCookie && isEmailAllowed(existingCookie)) {
           if (isMounted) setIsAdminLoggedIn(true);
           touchUserActivity();
+          // Point 60: Immediately sync canonical live database when logged in via cookie/mobile storage
+          await fetchSupabaseData();
         }
 
         // Check Supabase Auth session if configured
@@ -228,6 +294,39 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
     };
   }, [fetchSupabaseData]);
+
+  // Point 60: Auto re-sync live database on visibility change, focus, and route change
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+
+    fetchSupabaseData();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchSupabaseData();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      fetchSupabaseData();
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Periodic 30-second live sync
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchSupabaseData();
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [isAdminLoggedIn, pathname, fetchSupabaseData]);
 
   // Requirement 21: Active Web Inactivity Heartbeat & Auto-Timeout Detection
   useEffect(() => {
@@ -779,6 +878,10 @@ export function MitraProvider({ children }: { children: React.ReactNode }) {
         setAllVendorsAutoMonthlyReport,
         autoConfirmOverdueDeliveries,
         clearOperationalData,
+        theme,
+        setTheme,
+        toggleTheme,
+        refreshData,
       }}
     >
       {children}

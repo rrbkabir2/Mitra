@@ -67,6 +67,8 @@ export default function TodayPage() {
   const [inlinePurchaseQty, setInlinePurchaseQty] = useState(1);
   const [inlinePurchasePrice, setInlinePurchasePrice] = useState(250);
   const [inlinePurchasePhoto, setInlinePurchasePhoto] = useState<string | null>(null);
+  const [inlineVendorId, setInlineVendorId] = useState<string>('');
+  const [deliveryVendorId, setDeliveryVendorId] = useState<string>('');
   const [isSubmittingInlinePurchase, setIsSubmittingInlinePurchase] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
@@ -98,6 +100,7 @@ export default function TodayPage() {
     personalUrl?: string;
     entryId?: string;
     vendorPhone?: string;
+    vendorName?: string;
   } | null>(null);
 
   const getVendorName = (vendorId: string) => {
@@ -432,7 +435,8 @@ export default function TodayPage() {
   // Submit Quick Entry
   const handleSubmitEntry = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dairyVendor) {
+    const chosenVendor = vendors.find((v) => String(v.id).trim() === String(deliveryVendorId || dairyVendor?.id).trim()) || dairyVendor;
+    if (!chosenVendor) {
       alert('No active dairy vendor registered.');
       return;
     }
@@ -445,7 +449,7 @@ export default function TodayPage() {
       // 1. Write immutable record to data layer
       const createdEntry = await addDeliveryEntry({
         household_id: household.id,
-        vendor_id: dairyVendor.id,
+        vendor_id: chosenVendor.id,
         product_id: activeMilkProduct?.id,
         quantity: entryQuantity,
         unit_price: currentRate,
@@ -460,9 +464,9 @@ export default function TodayPage() {
 
       // 2. Dispatch multi-channel message (WhatsApp Cloud API, Fast2SMS, Personal Phone 1-Tap)
       const dispatchRes = await messagingService.dispatchDelivery({
-        vendorPhone: dairyVendor.phone_number,
-        vendorName: dairyVendor.name,
-        vendorToken: dairyVendor.access_token,
+        vendorPhone: chosenVendor.phone_number,
+        vendorName: chosenVendor.name,
+        vendorToken: chosenVendor.access_token,
         entryId: createdEntry.id,
         date: today,
         time: entryTime || new Date().toTimeString().substring(0, 5),
@@ -478,10 +482,10 @@ export default function TodayPage() {
       const personalUrl = dispatchRes.channelResults.personal_phone?.personalUrl;
 
       // Point 49: If personal phone channel is enabled and native share is supported, offer native share
-      if (typeof navigator !== 'undefined' && navigator.share && messagingService.getEnabledChannels().includes('personal_phone')) {
+      if (typeof navigator !== 'undefined' && navigator.share && messagingService.getActiveChannels().includes('personal_phone')) {
         try {
           const shareText = messagingService.generateMessageText({
-            vendorName: dairyVendor.name,
+            vendorName: chosenVendor.name,
             date: today,
             time: entryTime || new Date().toTimeString().substring(0, 5),
             milkType: selectedSubtype === 'cow' ? 'Cow' : 'Buffalo',
@@ -489,10 +493,10 @@ export default function TodayPage() {
             unitPrice: currentRate,
             totalPrice: grandTotal,
             extraItems: extraItems,
-            portalUrl: `${appUrl}/v/${dairyVendor.access_token}`,
+            portalUrl: `${appUrl}/v/${chosenVendor.access_token}`,
           });
           navigator.share({
-            title: `Mitra Delivery - ${dairyVendor.name}`,
+            title: `Mitra Delivery - ${chosenVendor.name}`,
             text: shareText,
           }).catch(() => {});
         } catch {
@@ -504,10 +508,11 @@ export default function TodayPage() {
       setSuccessToast({
         show: true,
         message: 'Delivery entry logged & dispatched to vendor!',
-        details: `Dispatched to ${dairyVendor.name} (${dairyVendor.phone_number}). Status is pending vendor confirmation.`,
+        details: `Dispatched to ${chosenVendor.name} (${chosenVendor.phone_number}). Status is pending vendor confirmation.`,
         personalUrl,
         entryId: createdEntry.id,
-        vendorPhone: dairyVendor.phone_number,
+        vendorPhone: chosenVendor.phone_number,
+        vendorName: chosenVendor.name,
       });
 
       setTimeout(() => setSuccessToast(null), personalUrl ? 15000 : 6000);
@@ -622,20 +627,48 @@ export default function TodayPage() {
   // Submit Inline One-Time Purchase
   const handleInlinePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inlinePurchaseName || !dairyVendor) return;
+    const targetVendor = vendors.find((v) => String(v.id).trim() === String(inlineVendorId || dairyVendor?.id).trim()) || dairyVendor;
+    if (!inlinePurchaseName.trim() || !targetVendor) {
+      alert('Please enter a product name and select a valid vendor.');
+      return;
+    }
+
+    if (!targetVendor.phone_number || !targetVendor.phone_number.trim()) {
+      alert(`The selected vendor "${targetVendor.name}" does not have a phone number on file.`);
+      return;
+    }
 
     setIsSubmittingInlinePurchase(true);
+    const appUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+
     try {
+      // 1. Record purchase
       await addPurchase({
         household_id: household.id,
-        vendor_id: dairyVendor.id,
-        product_name: inlinePurchaseName,
+        vendor_id: targetVendor.id,
+        product_name: inlinePurchaseName.trim(),
         quantity: inlinePurchaseQty,
         total_price: inlinePurchasePrice,
         photo_url: inlinePurchasePhoto,
         date: todayDateStr,
-        vendor_name: dairyVendor.name,
+        vendor_name: targetVendor.name,
       });
+
+      // 2. Dispatch strictly through active/enabled channels addressed to targetVendor
+      const dispatchRes = await messagingService.dispatchPurchase({
+        vendorPhone: targetVendor.phone_number.trim(),
+        vendorName: targetVendor.name,
+        vendorToken: targetVendor.access_token,
+        productName: inlinePurchaseName.trim(),
+        quantity: inlinePurchaseQty,
+        unit: 'count',
+        totalPrice: inlinePurchasePrice,
+        date: todayDateStr,
+        photoUrl: inlinePurchasePhoto,
+        appUrl,
+      });
+
+      const personalUrl = dispatchRes.channelResults.personal_phone?.personalUrl;
 
       setInlinePurchaseName('');
       setInlinePurchaseQty(1);
@@ -645,10 +678,13 @@ export default function TodayPage() {
 
       setSuccessToast({
         show: true,
-        message: 'Purchase recorded & sent via WhatsApp!',
-        details: `One-time item "${inlinePurchaseName}" (₹${inlinePurchasePrice}) sent to ${dairyVendor.name}.`,
+        message: `Purchase recorded! ${dispatchRes.summaryText}`,
+        details: `One-time item "${inlinePurchaseName}" (₹${inlinePurchasePrice}) recorded for ${targetVendor.name}.`,
+        personalUrl,
+        vendorPhone: targetVendor.phone_number.trim(),
+        vendorName: targetVendor.name,
       });
-      setTimeout(() => setSuccessToast(null), 5000);
+      setTimeout(() => setSuccessToast(null), personalUrl ? 15000 : 6000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error sending purchase';
       alert(msg);
@@ -717,7 +753,7 @@ export default function TodayPage() {
                   id="btn-toast-personal-whatsapp"
                 >
                   <Share2 size={15} />
-                  <span>Open WhatsApp (1-Tap Send to {dairyVendor?.name})</span>
+                  <span>Open WhatsApp (1-Tap Send to {successToast.vendorName || dairyVendor?.name})</span>
                 </button>
               </div>
             )}
@@ -1056,6 +1092,24 @@ export default function TodayPage() {
           {isSendPurchaseOpen && (
             <div className="figma-feature-body">
               <form onSubmit={handleInlinePurchaseSubmit}>
+                {/* Point 58: Strict Vendor Selector for Inline Purchase */}
+                <div className="form-group">
+                  <label className="form-label">Vendor / Supplier</label>
+                  <select
+                    value={inlineVendorId || dairyVendor?.id || ''}
+                    onChange={(e) => setInlineVendorId(e.target.value)}
+                    className="form-select"
+                    required
+                    id="select-inline-purchase-vendor"
+                  >
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.vendor_type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Item / Product Name</label>
                   <input
@@ -1388,6 +1442,25 @@ export default function TodayPage() {
             </div>
 
             <form onSubmit={handleSubmitEntry}>
+              {/* Point 58: Vendor selector for multi-vendor households */}
+              {vendors.length > 1 && (
+                <div className="form-group">
+                  <label className="form-label">Vendor / Dairy Supplier</label>
+                  <select
+                    value={deliveryVendorId || dairyVendor?.id || ''}
+                    onChange={(e) => setDeliveryVendorId(e.target.value)}
+                    className="form-select"
+                    id="select-delivery-vendor"
+                  >
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.vendor_type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Stepper Quantity Field */}
               <div className="form-group">
                 <label className="form-label">{t.today.quantity} (Litres)</label>

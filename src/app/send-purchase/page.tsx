@@ -39,7 +39,7 @@ export default function SendPurchasePage() {
   const [enabledChannels, setEnabledChannels] = useState<MessagingChannel[]>([]);
 
   useEffect(() => {
-    setEnabledChannels(messagingService.getEnabledChannels());
+    setEnabledChannels(messagingService.getActiveChannels());
   }, []);
 
   // Sync selectedVendorId if empty
@@ -83,9 +83,7 @@ export default function SendPurchasePage() {
       setProductName(found.name);
       setProductUnit(found.unit_type);
       setTotalPrice(found.default_price * quantity);
-      if (found.vendor_id && vendors.some((v) => v.id === found.vendor_id)) {
-        setSelectedVendorId(found.vendor_id);
-      }
+      // Point 58: Never overwrite user-selected vendor when browsing catalog products
     } else {
       setIsCustomProduct(false);
       setProductName('');
@@ -103,13 +101,29 @@ export default function SendPurchasePage() {
     }
   };
 
-  // Requirement 28: Record and dispatch across all enabled channels
+  // Requirement 28 & Point 58: Record and dispatch strictly across active/enabled channels
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productName.trim() || !selectedVendorId) return;
+    if (!productName.trim() || !selectedVendorId) {
+      alert('Please enter a product name and select a vendor.');
+      return;
+    }
 
     setIsSubmitting(true);
-    const vendor = vendors.find((v) => v.id === selectedVendorId) || vendors[0];
+    // Point 58: Strictly resolve to the EXACT vendor selected by the user, never defaulting to vendors[0]
+    const vendor = vendors.find((v) => String(v.id).trim() === String(selectedVendorId).trim());
+    if (!vendor) {
+      alert('Selected vendor not found in registry. Please select a valid vendor.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!vendor.phone_number || !vendor.phone_number.trim()) {
+      alert(`The selected vendor "${vendor.name}" does not have a phone number on file.`);
+      setIsSubmitting(false);
+      return;
+    }
+
     const today = new Date().toISOString().split('T')[0];
     const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
 
@@ -119,20 +133,20 @@ export default function SendPurchasePage() {
       // 1. Record purchase in household ledger
       await addPurchase({
         household_id: household.id,
-        vendor_id: selectedVendorId,
+        vendor_id: vendor.id,
         product_name: recordedName,
         quantity,
         total_price: totalPrice,
         photo_url: photoDataUrl,
         date: today,
-        vendor_name: vendor?.name,
+        vendor_name: vendor.name,
       });
 
-      // 2. Dispatch through ALL active channels (WhatsApp, Fast2SMS, Personal Phone)
+      // 2. Dispatch through active/enabled channels strictly addressed to the selected vendor
       const dispatchRes = await messagingService.dispatchPurchase({
-        vendorPhone: vendor?.phone_number || '',
-        vendorName: vendor?.name || 'Vendor',
-        vendorToken: vendor?.access_token,
+        vendorPhone: vendor.phone_number.trim(),
+        vendorName: vendor.name,
+        vendorToken: vendor.access_token,
         productName: productName.trim(),
         quantity,
         unit: productUnit,
@@ -145,8 +159,8 @@ export default function SendPurchasePage() {
       setToastData({
         message: `Purchase of ${productName} (₹${totalPrice}) recorded! ${dispatchRes.summaryText}`,
         personalUrl: dispatchRes.channelResults.personal_phone?.personalUrl,
-        vendorPhone: vendor?.phone_number,
-        vendorName: vendor?.name,
+        vendorPhone: vendor.phone_number.trim(),
+        vendorName: vendor.name,
       });
 
       // Reset form

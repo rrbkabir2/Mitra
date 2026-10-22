@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useMitra } from '@/context/MitraContext';
 import { messagingService, MessagingChannel, MessageLog } from '@/lib/messaging';
+import { sendWhatsAppDeliveryMessage } from '@/lib/whatsapp';
 import {
   MessageSquare,
   AlertTriangle,
@@ -16,6 +17,8 @@ import {
   Zap,
   CheckCircle2,
   XCircle,
+  Phone,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function WhatsAppUsagePage() {
@@ -24,11 +27,29 @@ export default function WhatsAppUsagePage() {
   const [enabledChannels, setEnabledChannels] = useState<MessagingChannel[]>([]);
   const [logs, setLogs] = useState<MessageLog[]>([]);
   const [testNotice, setTestNotice] = useState<string | null>(null);
+  
+  // Point 59: Customizable real recipient phone number for live testing
+  const [testPhoneNumber, setTestPhoneNumber] = useState<string>('');
 
   useEffect(() => {
     setEnabledChannels(messagingService.getEnabledChannels());
     setLogs(messagingService.getAllLogs());
-  }, []);
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('mitra_test_phone');
+      if (saved) {
+        setTestPhoneNumber(saved);
+      } else if (vendors.length > 0 && vendors[0].phone_number) {
+        setTestPhoneNumber(vendors[0].phone_number);
+      }
+    }
+  }, [vendors]);
+
+  const handlePhoneChange = (val: string) => {
+    setTestPhoneNumber(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mitra_test_phone', val);
+    }
+  };
 
   const handleToggleChannel = (channel: MessagingChannel) => {
     const isCurrentlyEnabled = enabledChannels.includes(channel);
@@ -54,11 +75,128 @@ export default function WhatsAppUsagePage() {
   const waProjectedMonthEnd = Math.round(waDailyPace * daysInMonth);
   const isTrendingToExceed = waProjectedMonthEnd > FREE_TIER_LIMIT;
 
-  const handleTestDispatch = (channel: MessagingChannel) => {
-    messagingService.logMessage(channel, '+91 98765 43210', 'success', channel === 'fast2sms' ? 0.25 : 0, 'Test delivery message dispatch');
-    setLogs(messagingService.getAllLogs());
-    setTestNotice(`Recorded test dispatch for ${channel.replace('_', ' ').toUpperCase()}`);
-    setTimeout(() => setTestNotice(null), 4000);
+  // Point 59: Genuine Test Send using user-typed real phone number
+  const handleTestDispatch = async (channel: MessagingChannel) => {
+    const cleanDigits = testPhoneNumber.replace(/[^0-9]/g, '');
+    if (cleanDigits.length < 10) {
+      alert('Please enter a valid 10-digit mobile number in the Test Recipient field first.');
+      return;
+    }
+    const formatted10 = cleanDigits.slice(-10);
+    const formattedIntl = `91${formatted10}`;
+    const testNow = new Date();
+    const timeStr = testNow.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (channel === 'personal_phone') {
+      const testMsg =
+        `🧪 *Mitra Channel Verification*\n\n` +
+        `Namaste! This is a real test verification message from Mitra Delivery Confirmation Platform.\n` +
+        `📅 Date: ${testNow.toLocaleDateString()}\n` +
+        `⏰ Time: ${timeStr}\n` +
+        `📱 Channel: Personal Phone 1-Tap\n` +
+        `✅ Delivery Status: Verified & Operational\n\n` +
+        `🔒 Transparent and permanent household record.`;
+      const waUrl = `https://wa.me/${formattedIntl}?text=${encodeURIComponent(testMsg)}`;
+
+      const isMobile = typeof navigator !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+      if (isMobile) {
+        window.location.href = `whatsapp://send?phone=${formattedIntl}&text=${encodeURIComponent(testMsg)}`;
+        setTimeout(() => {
+          window.open(waUrl, '_blank', 'noopener,noreferrer');
+        }, 1200);
+      } else {
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+      }
+
+      messagingService.logMessage('personal_phone', `+91 ${formatted10}`, 'success', 0, 'Real test verification launched via WhatsApp');
+      setLogs(messagingService.getAllLogs());
+      setTestNotice(`WhatsApp opened addressed to +91 ${formatted10}!`);
+      setTimeout(() => setTestNotice(null), 5000);
+      return;
+    }
+
+    if (channel === 'whatsapp_cloud') {
+      const configs = messagingService.getChannelConfigs();
+      const waConfig = configs.find((c) => c.id === 'whatsapp_cloud');
+      if (!waConfig?.isConfigured) {
+        messagingService.logMessage('whatsapp_cloud', `+91 ${formatted10}`, 'failed', 0, 'Meta Cloud API not configured (Missing token/phone ID)');
+        setLogs(messagingService.getAllLogs());
+        alert('WhatsApp Business Cloud API is not configured with live Meta credentials (WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID are not set in environment).');
+        return;
+      }
+
+      try {
+        setTestNotice(`Sending test message via Meta Cloud API to +91 ${formatted10}...`);
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+        const res = await sendWhatsAppDeliveryMessage({
+          vendorPhone: formattedIntl,
+          vendorName: 'Test Recipient',
+          vendorToken: 'test-token',
+          entryId: `test-${Date.now()}`,
+          date: testNow.toISOString().split('T')[0],
+          time: timeStr,
+          milkType: 'Cow',
+          quantity: 1,
+          unitPrice: 60,
+          totalPrice: 60,
+          appUrl: origin,
+        });
+
+        messagingService.logMessage('whatsapp_cloud', `+91 ${formatted10}`, res.success ? 'success' : 'failed', 0, res.success ? 'Meta API test delivered' : res.error);
+        setLogs(messagingService.getAllLogs());
+        if (res.success) {
+          setTestNotice(`Test message successfully delivered via WhatsApp Cloud API to +91 ${formatted10}!`);
+        } else {
+          alert(`WhatsApp Cloud API error: ${res.error || 'Failed to dispatch'}`);
+        }
+        setTimeout(() => setTestNotice(null), 5000);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Failed to send WhatsApp API test';
+        messagingService.logMessage('whatsapp_cloud', `+91 ${formatted10}`, 'failed', 0, msg);
+        setLogs(messagingService.getAllLogs());
+        alert(msg);
+      }
+      return;
+    }
+
+    if (channel === 'fast2sms') {
+      const configs = messagingService.getChannelConfigs();
+      const smsConfig = configs.find((c) => c.id === 'fast2sms');
+      if (!smsConfig?.isConfigured) {
+        messagingService.logMessage('fast2sms', `+91 ${formatted10}`, 'failed', 0.25, 'Fast2SMS API key not configured');
+        setLogs(messagingService.getAllLogs());
+        alert('Fast2SMS Gateway is not configured with a live API key. Please configure FAST2SMS_API_KEY in your environment.');
+        return;
+      }
+
+      try {
+        setTestNotice(`Sending test SMS via Fast2SMS to +91 ${formatted10}...`);
+        const res = await fetch('/api/messaging/fast2sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: formatted10,
+            message: `Mitra Test: Channel verified at ${timeStr}. Transparent household delivery confirmation.`,
+            entryId: `test-${Date.now()}`,
+          }),
+        });
+        const data = await res.json();
+        const success = res.ok && data.success;
+        messagingService.logMessage('fast2sms', `+91 ${formatted10}`, success ? 'success' : 'failed', 0.25, data.message || (success ? 'SMS Delivered' : 'Failed'));
+        setLogs(messagingService.getAllLogs());
+        if (success) {
+          setTestNotice(`Test SMS dispatched via Fast2SMS to +91 ${formatted10}!`);
+        } else {
+          alert(`Fast2SMS error: ${data.message || 'SMS delivery failed'}`);
+        }
+        setTimeout(() => setTestNotice(null), 5000);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Fast2SMS error';
+        messagingService.logMessage('fast2sms', `+91 ${formatted10}`, 'failed', 0.25, msg);
+        setLogs(messagingService.getAllLogs());
+        alert(msg);
+      }
+    }
   };
 
   return (
@@ -161,6 +299,162 @@ export default function WhatsAppUsagePage() {
           })}
         </div>
       </div>
+
+      {/* Point 59: Live Channel Test Send Card with Editable Custom Recipient Phone Number */}
+      <section
+        className="content-card"
+        style={{
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+          border: '1.5px solid #bbf7d0',
+          padding: '1.25rem 1.5rem',
+          marginBottom: '1.5rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ background: '#16a34a', color: '#ffffff', padding: '0.4rem', borderRadius: '8px', display: 'flex' }}>
+              <Zap size={18} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#166534' }}>
+                End-to-End Channel Test Send
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: '#15803d', marginTop: '0.1rem' }}>
+                Enter any real mobile number to verify live delivery confirmation to a device you control
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.72rem', background: '#dcfce7', color: '#166534', padding: '0.2rem 0.6rem', borderRadius: '999px', fontWeight: 700 }}>
+            Real-Time Verification
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+          <div>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534' }}>
+              Test Recipient Mobile Number:
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span
+                style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #bbf7d0',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.55rem 0.75rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  color: '#166534',
+                }}
+              >
+                +91
+              </span>
+              <input
+                type="tel"
+                placeholder="Enter 10-digit mobile number"
+                value={testPhoneNumber}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                className="form-input"
+                style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #bbf7d0',
+                  fontWeight: 700,
+                  fontSize: '0.92rem',
+                  color: '#1e293b',
+                }}
+                id="input-test-recipient-phone"
+              />
+            </div>
+            {vendors.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.45rem' }}>
+                <span style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: 600 }}>Quick fill:</span>
+                {vendors.slice(0, 3).map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => handlePhoneChange(v.phone_number || '')}
+                    style={{
+                      fontSize: '0.7rem',
+                      padding: '0.15rem 0.45rem',
+                      background: '#ffffff',
+                      border: '1px solid #86efac',
+                      borderRadius: '4px',
+                      color: '#166534',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {v.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#166534' }}>
+              Dispatch Test Message Via:
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => handleTestDispatch('personal_phone')}
+                className="btn-primary"
+                style={{
+                  flex: 1,
+                  minWidth: '130px',
+                  fontSize: '0.8rem',
+                  padding: '0.55rem 0.85rem',
+                  background: '#25D366',
+                  borderColor: '#25D366',
+                  boxShadow: '0 2px 6px rgba(37,211,102,0.3)',
+                }}
+                id="btn-test-send-personal"
+              >
+                <Smartphone size={15} />
+                <span>Test WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTestDispatch('whatsapp_cloud')}
+                className="btn-secondary"
+                style={{
+                  flex: 1,
+                  minWidth: '130px',
+                  fontSize: '0.8rem',
+                  padding: '0.55rem 0.85rem',
+                  background: '#ffffff',
+                  borderColor: '#bbf7d0',
+                  color: '#166534',
+                }}
+                id="btn-test-send-meta-cloud"
+              >
+                <MessageSquare size={15} />
+                <span>Test Cloud API</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTestDispatch('fast2sms')}
+                className="btn-secondary"
+                style={{
+                  flex: 1,
+                  minWidth: '130px',
+                  fontSize: '0.8rem',
+                  padding: '0.55rem 0.85rem',
+                  background: '#ffffff',
+                  borderColor: '#fed7aa',
+                  color: '#9a3412',
+                }}
+                id="btn-test-send-fast2sms"
+              >
+                <CreditCard size={15} />
+                <span>Test Fast2SMS</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* =========================================================================
           POINT 15: SIDE-BY-SIDE SPLIT TRACKERS FOR CURRENTLY ACTIVE CHANNELS
